@@ -1,0 +1,22 @@
+# Frontend Node packages and build outputs
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/npm-debug.log*
+
+# Backend Python virtual environments and caches
+backend/venv/
+backend/__pycache__/
+backend/*/__pycache__/
+talent_intelligence/__pycache__/
+*.pyc
+
+# Local databases and sensitive configuration files
+backend/db.sqlite3
+backend/.env
+
+# OS and IDE caches
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
