@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useJob } from '../context/JobContext';
-import AuthModal from './AuthModal';
 
 const Sidebar = () => {
-  const { activeTab, setActiveTab, candidates, files, results, isAuthenticated, username, logout } = useJob();
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const { activeTab, setActiveTab, candidates, files, results } = useJob();
 
   const navItems = [
     { id: 'jd', label: 'Job description', icon: 'ti-file-description', pip: null },
@@ -74,24 +72,7 @@ const Sidebar = () => {
           </button>
         ))}
 
-        {/* Recruiter Authentication Section */}
-        <div className="nlbl" style={{ marginTop: '18px' }}>Recruiter</div>
-        {isAuthenticated ? (
-          <>
-            <div style={{ padding: '2px 10px 8px', fontSize: '12px', color: 'var(--theme-blue-text)' }}>
-              Signed in as: <strong style={{ color: 'var(--theme-blue-dark)' }}>{username}</strong>
-            </div>
-            <button className="ni" onClick={logout}>
-              <i className="ti ti-logout" aria-hidden="true"></i>
-              Sign Out
-            </button>
-          </>
-        ) : (
-          <button className="ni" onClick={() => setIsAuthOpen(true)}>
-            <i className="ti ti-login" aria-hidden="true"></i>
-            Sign In / Register
-          </button>
-        )}
+        {/* Recruiter Authentication Section Removed */}
       </div>
 
       <div className="sfoot">
@@ -102,8 +83,6 @@ const Sidebar = () => {
           india.run challenge
         </p>
       </div>
-
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 };

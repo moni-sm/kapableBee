@@ -202,9 +202,9 @@ export const JobProvider = ({ children }) => {
   const [activeTab, setActiveTab] = useState('jd');
   const [toastMessage, setToastMessage] = useState('');
 
-  // Authentication states
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('access_token'));
-  const [username, setUsername] = useState(localStorage.getItem('username') || '');
+  // Authentication states (Defaulted to true for direct MongoDB storage without recruiter authentication)
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [username, setUsername] = useState('Admin');
 
   const showToast = (msg) => {
     setToastMessage(msg);

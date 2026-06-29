@@ -186,7 +186,7 @@ class CandidateViewSet(viewsets.ViewSet):
         if candidates_collection is None:
             return Response({"error": "Database offline"}, status=503)
             
-        cands = list(candidates_collection.find({"user_id": request.user.id}))
+        cands = list(candidates_collection.find())
         
         # Convert _id to string for serialization
         for c in cands:
@@ -202,7 +202,7 @@ class CandidateViewSet(viewsets.ViewSet):
         serializer = CandidateSerializer(data=request.data)
         if serializer.is_valid():
             doc = serializer.validated_data
-            doc['user_id'] = request.user.id
+            doc['user_id'] = 'default'
             
             result = candidates_collection.insert_one(doc)
             doc['id'] = str(result.inserted_id)
@@ -223,7 +223,7 @@ class CandidateViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             docs = serializer.validated_data
             for doc in docs:
-                doc['user_id'] = request.user.id
+                doc['user_id'] = 'default'
             
             if docs:
                 result = candidates_collection.insert_many(docs)
@@ -239,8 +239,7 @@ class CandidateViewSet(viewsets.ViewSet):
 
         try:
             result = candidates_collection.delete_one({
-                "_id": ObjectId(pk),
-                "user_id": request.user.id
+                "_id": ObjectId(pk)
             })
             if result.deleted_count > 0:
                 return Response({"message": "Candidate deleted successfully"}, status=status.HTTP_200_OK)
@@ -257,7 +256,7 @@ class JobViewSet(viewsets.ViewSet):
         if jobs_collection is None:
             return Response({"error": "Database offline"}, status=503)
 
-        jobs = list(jobs_collection.find({"user_id": request.user.id}))
+        jobs = list(jobs_collection.find())
         for j in jobs:
             j['id'] = str(j['_id'])
             
@@ -271,12 +270,11 @@ class JobViewSet(viewsets.ViewSet):
         serializer = JobSerializer(data=request.data)
         if serializer.is_valid():
             doc = serializer.validated_data
-            doc['user_id'] = request.user.id
+            doc['user_id'] = 'default'
             
-            # Upsert support: If a job with same title exists for user, update it
+            # Upsert support: If a job with same title exists, update it
             existing = jobs_collection.find_one({
-                "title": doc['title'],
-                "user_id": request.user.id
+                "title": doc['title']
             })
             
             if existing:
@@ -601,9 +599,9 @@ class RankingView(APIView):
         # ── Resolve candidate source ───────────────────────────────────────
         if cands_payload:
             cands = list(cands_payload)
-        elif candidates_collection is not None and request.user and request.user.is_authenticated:
+        elif candidates_collection is not None:
             # Stream from MongoDB in cursor batches to keep RAM usage flat
-            cursor = candidates_collection.find({"user_id": request.user.id}, batch_size=5000)
+            cursor = candidates_collection.find(batch_size=5000)
             cands = []
             for doc in cursor:
                 doc['id'] = str(doc['_id'])
