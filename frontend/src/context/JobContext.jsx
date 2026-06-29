@@ -195,6 +195,9 @@ export const JobProvider = ({ children }) => {
   const [jobDescription, setJobDescription] = useState('');
   const [keyPriorities, setKeyPriorities] = useState('');
   const [candidates, setCandidates] = useState([]);
+  const [totalCandidatesCount, setTotalCandidatesCount] = useState(0);
+  const [uploadState, setUploadState] = useState('idle'); // 'idle' | 'uploading' | 'completed' | 'failed'
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [files, setFiles] = useState([]);
   const [results, setResults] = useState([]);
   const [rankingState, setRankingState] = useState('idle'); // 'idle' | 'loading' | 'completed' | 'failed'
@@ -247,6 +250,7 @@ export const JobProvider = ({ children }) => {
     setUsername('');
     setIsAuthenticated(false);
     setCandidates([]);
+    setTotalCandidatesCount(0);
     setResults([]);
     setFiles([]);
     showToast('Logged out successfully');
@@ -256,9 +260,14 @@ export const JobProvider = ({ children }) => {
   const fetchCandidates = async () => {
     try {
       const res = await API.get('candidates/');
-      setCandidates(res.data);
-      if (res.data.length > 0) {
-        setFiles([{ name: 'django_database', size: 'Sync OK', candidatesCount: res.data.length }]);
+      const data = res.data;
+      const results = Array.isArray(data) ? data : (data.results || []);
+      const count = Array.isArray(data) ? data.length : (data.count || 0);
+
+      setCandidates(results);
+      setTotalCandidatesCount(count);
+      if (count > 0) {
+        setFiles([{ name: 'django_database', size: 'Sync OK', candidatesCount: count }]);
       }
     } catch (e) {
       console.error('Error fetching candidates:', e);
@@ -327,19 +336,28 @@ export const JobProvider = ({ children }) => {
 
   const loadSampleDataset = async () => {
     if (isAuthenticated) {
+      setUploadState('uploading');
+      setUploadProgress(20);
       // Save all sample candidates to backend MongoDB
       try {
         const res = await API.post('candidates/bulk/', SAMPLES);
         const newCands = res.data;
-        setCandidates(prev => [...prev, ...newCands]);
+        setCandidates(prev => [...newCands, ...prev].slice(0, 50));
+        setTotalCandidatesCount(prev => prev + SAMPLES.length);
         setFiles(prev => [...prev, { name: 'sample_dataset', size: '12.4 KB', candidatesCount: SAMPLES.length }]);
         showToast('Sample dataset saved to server MongoDB');
+        setUploadProgress(100);
+        setUploadState('completed');
+        setTimeout(() => setUploadState('idle'), 2000);
       } catch (e) {
         console.error('Error saving sample candidates:', e);
         showToast('Error syncing sample dataset to server');
+        setUploadState('failed');
+        setTimeout(() => setUploadState('idle'), 2000);
       }
     } else {
       setCandidates([...SAMPLES]);
+      setTotalCandidatesCount(SAMPLES.length);
       setFiles([{ name: 'kapablebee_sample.json', size: '12.4 KB', candidatesCount: SAMPLES.length }]);
       setResults([]);
       showToast('Sample dataset loaded (Local Guest Mode)');
@@ -350,7 +368,8 @@ export const JobProvider = ({ children }) => {
     if (isAuthenticated) {
       try {
         const res = await API.post('candidates/', c);
-        setCandidates((prev) => [...prev, res.data]);
+        setCandidates((prev) => [res.data, ...prev].slice(0, 50));
+        setTotalCandidatesCount((prev) => prev + 1);
         setResults([]);
         showToast(`Saved ${c.name} to server`);
       } catch (e) {
@@ -358,7 +377,8 @@ export const JobProvider = ({ children }) => {
         showToast('Error saving candidate to server');
       }
     } else {
-      setCandidates((prev) => [...prev, c]);
+      setCandidates((prev) => [c, ...prev]);
+      setTotalCandidatesCount((prev) => prev + 1);
       setResults([]);
       showToast(`Added ${c.name} (Local Guest Mode)`);
     }
@@ -372,6 +392,7 @@ export const JobProvider = ({ children }) => {
       try {
         await API.delete(`candidates/${cand.id}/`);
         setCandidates((prev) => prev.filter((_, i) => i !== index));
+        setTotalCandidatesCount((prev) => Math.max(0, prev - 1));
         setResults([]);
         showToast(`Deleted ${cand.name} from server`);
       } catch (e) {
@@ -380,6 +401,7 @@ export const JobProvider = ({ children }) => {
       }
     } else {
       setCandidates((prev) => prev.filter((_, i) => i !== index));
+      setTotalCandidatesCount((prev) => Math.max(0, prev - 1));
       setResults([]);
       showToast(`Removed ${cand.name} (Local Guest Mode)`);
     }
@@ -451,19 +473,38 @@ export const JobProvider = ({ children }) => {
 
     if (newCands.length > 0) {
       if (isAuthenticated) {
+        setUploadState('uploading');
+        setUploadProgress(0);
         try {
-          const res = await API.post('candidates/bulk/', newCands);
-          const savedCands = res.data;
-          setCandidates((prev) => [...prev, ...savedCands]);
+          const CHUNK_SIZE = 500;
+          let savedCands = [];
+          
+          for (let i = 0; i < newCands.length; i += CHUNK_SIZE) {
+            const chunk = newCands.slice(i, i + CHUNK_SIZE);
+            const res = await API.post('candidates/bulk/', chunk);
+            savedCands = [...savedCands, ...res.data];
+            const percent = Math.min(95, Math.round(((i + chunk.length) / newCands.length) * 100));
+            setUploadProgress(percent);
+          }
+
+          // Slice display state candidates to latest 50
+          setCandidates((prev) => [...savedCands, ...prev].slice(0, 50));
+          setTotalCandidatesCount((prev) => prev + savedCands.length);
           setFiles((prev) => [...prev, { name, size: `${(size / 1024).toFixed(1)} KB`, candidatesCount: savedCands.length }]);
           setResults([]);
           showToast(`Saved ${savedCands.length} candidates from ${name} to server`);
+          setUploadProgress(100);
+          setUploadState('completed');
+          setTimeout(() => setUploadState('idle'), 2000);
         } catch (e) {
           console.error('Error saving parsed candidates:', e);
           showToast('Error syncing uploaded candidates to server');
+          setUploadState('failed');
+          setTimeout(() => setUploadState('idle'), 2000);
         }
       } else {
-        setCandidates((prev) => [...prev, ...newCands]);
+        setCandidates((prev) => [...newCands, ...prev]);
+        setTotalCandidatesCount((prev) => prev + newCands.length);
         setFiles((prev) => [...prev, { name, size: `${(size / 1024).toFixed(1)} KB`, candidatesCount: newCands.length }]);
         setResults([]);
         showToast(`Loaded ${newCands.length} candidates (Local Guest Mode)`);
@@ -897,6 +938,11 @@ export const JobProvider = ({ children }) => {
         parseFile,
         runRanking,
         finalizeRanking,
+        
+        // Exported count & upload states
+        totalCandidatesCount,
+        uploadState,
+        uploadProgress,
         
         // Auth variables & methods
         isAuthenticated,

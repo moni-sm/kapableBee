@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useJob } from '../context/JobContext';
 
 const UploadDatasetView = () => {
-  const { files, parseFile, loadSampleDataset, runRanking } = useJob();
+  const { files, parseFile, loadSampleDataset, runRanking, uploadState, uploadProgress } = useJob();
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -48,19 +48,68 @@ const UploadDatasetView = () => {
 
   return (
     <div id="v-upload" className="view-content animate-fade-in">
-      <div
-        className={`up-zone ${dragActive ? 'drag' : ''}`}
-        id="dz"
-        onClick={triggerFileInput}
-        onDragEnter={handleDrag}
-        onDragOver={handleDrag}
-        onDragLeave={handleDrag}
-        onDrop={handleDrop}
-      >
-        <i className="ti ti-cloud-upload uz-i" aria-hidden="true"></i>
-        <p className="uz-t">Drop files here or click to browse</p>
-        <small className="uz-s">CSV · JSON · TXT — multiple files OK</small>
-      </div>
+      {uploadState !== 'idle' ? (
+        <div className="card upload-progress-card animate-fade-in" style={{
+          padding: '30px 24px',
+          background: 'rgba(255, 255, 255, 0.85)',
+          backdropFilter: 'blur(12px)',
+          border: '1.5px solid #D4EEFF',
+          borderRadius: '16px',
+          textAlign: 'center',
+          marginBottom: '20px',
+          boxShadow: '0 8px 32px 0 rgba(12, 26, 46, 0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '16px' }}>
+            {uploadState === 'uploading' && (
+              <span className="spin" style={{ width: '18px', height: '18px', borderTopColor: 'var(--theme-amber)' }}></span>
+            )}
+            {uploadState === 'completed' && <i className="ti ti-circle-check" style={{ color: '#085041', fontSize: '22px' }}></i>}
+            {uploadState === 'failed' && <i className="ti ti-circle-x" style={{ color: '#791F1F', fontSize: '22px' }}></i>}
+            
+            <span style={{ fontWeight: 600, fontSize: '15px', color: '#0C1A2E' }}>
+              {uploadState === 'uploading' && 'Uploading Candidate Dataset...'}
+              {uploadState === 'completed' && 'Upload Completed Successfully!'}
+              {uploadState === 'failed' && 'Upload Failed. Please try again.'}
+            </span>
+          </div>
+
+          <div style={{
+            width: '100%',
+            height: '8px',
+            background: '#EAF5FF',
+            borderRadius: '100px',
+            overflow: 'hidden',
+            marginBottom: '10px'
+          }}>
+            <div style={{
+              width: `${uploadProgress}%`,
+              height: '100%',
+              background: uploadState === 'failed' ? '#791F1F' : 'linear-gradient(90deg, #F5A623 0%, #FFAE33 100%)',
+              transition: 'width 0.4s ease-in-out',
+              borderRadius: '100px'
+            }}></div>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+            <span>{uploadProgress}% processed</span>
+            <span>Please do not close this window</span>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`up-zone ${dragActive ? 'drag' : ''}`}
+          id="dz"
+          onClick={triggerFileInput}
+          onDragEnter={handleDrag}
+          onDragOver={handleDrag}
+          onDragLeave={handleDrag}
+          onDrop={handleDrop}
+        >
+          <i className="ti ti-cloud-upload uz-i" aria-hidden="true"></i>
+          <p className="uz-t">Drop files here or click to browse</p>
+          <small className="uz-s">CSV · JSON · TXT — multiple files OK</small>
+        </div>
+      )}
       <input
         type="file"
         id="fi"
@@ -69,6 +118,7 @@ const UploadDatasetView = () => {
         multiple
         style={{ display: 'none' }}
         onChange={handleFileChange}
+        disabled={uploadState !== 'idle'}
       />
 
       <div style={{ margin: '18px 0 8px' }} className="slbl">Supported formats</div>
@@ -125,14 +175,14 @@ const UploadDatasetView = () => {
             <div style={{ fontSize: '13px', fontWeight: 600, color: '#0C1A2E' }}>7 Indian tech candidates</div>
             <div style={{ fontSize: '11px', color: '#378ADD', marginTop: '2px' }}>Swiggy · Razorpay · PhonePe · Ola · Freshworks</div>
           </div>
-          <button className="btn honey" onClick={loadSampleDataset} style={{ padding: '5px 12px', fontSize: '12px' }}>
+          <button className="btn honey" onClick={loadSampleDataset} style={{ padding: '5px 12px', fontSize: '12px' }} disabled={uploadState !== 'idle'}>
             <i className="ti ti-sparkles" aria-hidden="true"></i> Load
           </button>
         </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px' }}>
-        <button className="btn honey" onClick={runRanking}>
+        <button className="btn honey" onClick={runRanking} disabled={uploadState !== 'idle'}>
           <i className="ti ti-brain" aria-hidden="true"></i> Rank candidates ↗
         </button>
       </div>

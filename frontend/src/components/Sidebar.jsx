@@ -2,12 +2,12 @@ import React from 'react';
 import { useJob } from '../context/JobContext';
 
 const Sidebar = () => {
-  const { activeTab, setActiveTab, candidates, files, results } = useJob();
+  const { activeTab, setActiveTab, totalCandidatesCount, files, results } = useJob();
 
   const navItems = [
     { id: 'jd', label: 'Job description', icon: 'ti-file-description', pip: null },
     { id: 'upload', label: 'Upload dataset', icon: 'ti-cloud-upload', pip: files.length || '0' },
-    { id: 'manual', label: 'Add manually', icon: 'ti-user-plus', pip: candidates.length || '0' },
+    { id: 'manual', label: 'Add manually', icon: 'ti-user-plus', pip: totalCandidatesCount || '0' },
     { id: 'results', label: 'Shortlist', icon: 'ti-list-numbers', pip: results.length > 0 ? results.length : '—', lit: results.length > 0 }
   ];
 

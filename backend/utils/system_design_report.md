@@ -34,10 +34,54 @@ The platform extracts key features from the JD input ([views.py:L612-L630](file:
 ---
 
 ## 4. Candidate Signals & Evaluation Beyond Keyword Matching
-Evaluation goes beyond basic keyword matching by assessing high-signal structural data:
+
+### What are Redrob Signals?
+
+In a real recruiting platform, candidates generate observable behavioral data beyond what they list statically in their profile:
+- Do they actually **respond to recruiter messages**?
+- Have they **logged in recently**?
+- Did they **complete the assessments** they started?
+- Are **recruiters saving their profile**?
+- Have they **completed previous interview cycles**?
+
+These behavioral signals are often more predictive of whether a candidate can actually be hired than their static profile. A perfect-on-paper candidate who hasn't logged in for 6 months and has a 5% response rate is, for hiring purposes, **not actually available**.
+
+KapableBee incorporates these signals as a stacked **availability multiplier** and a **Signals/Culture dimension score** applied on top of skill-match scoring.
+
+### Full Redrob Signals Schema (23 Fields)
+
+| # | Field | Type / Range | Description |
+|---|-------|-------------|-------------|
+| 1 | `profile_completeness_score` | 0–100 | How much of the profile they've filled in |
+| 2 | `signup_date` | date string | When they signed up on Redrob |
+| 3 | `last_active_date` | date string | When they last logged in |
+| 4 | `open_to_work_flag` | bool | Have they marked themselves available |
+| 5 | `profile_views_received_30d` | integer ≥ 0 | How often their profile has been viewed by recruiters in last 30 days |
+| 6 | `applications_submitted_30d` | integer ≥ 0 | How many roles they've applied to recently |
+| 7 | `recruiter_response_rate` | 0.0–1.0 | What fraction of recruiter messages they reply to |
+| 8 | `avg_response_time_hours` | number ≥ 0 | Median time to respond to a recruiter message |
+| 9 | `skill_assessment_scores` | dict[str, 0–100] | Per-skill Redrob assessment scores |
+| 10 | `connection_count` | integer ≥ 0 | Number of Redrob connections |
+| 11 | `endorsements_received` | integer ≥ 0 | Total skill endorsements received |
+| 12 | `notice_period_days` | 0–180 | Their stated notice period |
+| 13 | `expected_salary_range_inr_lpa.min / .max` | number ≥ 0 | Salary expectations in INR lakhs per annum |
+| 14 | `preferred_work_mode` | onsite/hybrid/remote/flexible | Their stated work-mode preference |
+| 15 | `willing_to_relocate` | bool | Will they relocate if needed |
+| 16 | `github_activity_score` | -1 to 100 | GitHub commits/contributions score (-1 if no GitHub linked) |
+| 17 | `search_appearance_30d` | integer ≥ 0 | How often they show up in recruiter searches |
+| 18 | `saved_by_recruiters_30d` | integer ≥ 0 | How many recruiters bookmarked them in last 30 days |
+| 19 | `interview_completion_rate` | 0.0–1.0 | What fraction of interviews they've actually attended |
+| 20 | `offer_acceptance_rate` | -1 to 1.0 | What fraction of offers they accepted (-1 if no prior offers) |
+| 21 | `verified_email` | bool | Whether their email address is verified |
+| 22 | `verified_phone` | bool | Whether their phone number is verified |
+| 23 | `linkedin_connected` | bool | Whether their LinkedIn account is connected |
+
+### How Signals Are Used in Scoring
+
 - **Pedigree & Tier Recognition**: Trajectory score boosts for top academic institutions (`IIT`, `IISc`, `BITS Pilani`, `IIM`, `UT Austin`) and product company scaling credentials (e.g., `Swiggy`, `PhonePe`, `Razorpay`, `Ola`).
 - **Verified Assessment Synergy**: Increases the skills score if the candidate has verified skills listed in their `redrob_signals.skill_assessment_scores` that overlap with the JD requirements.
 - **Disqualification Rules**: Deducts points or flags negative patterns, such as outsourcing/IT services backgrounds (e.g., `TCS`, `Infosys`, `Wipro`, `Cognizant` for specialized roles) or mismatched domains (e.g., computer vision backgrounds applying for NLP retrieval engineering).
+
 
 ---
 
@@ -65,12 +109,17 @@ The backend merges results across worker threads and sorts them descending by `o
 - **Skills Match Boost**: Base skills match is computed as:
   $$\text{Skills Match} = 40 + \left( \frac{\text{Matched Keywords}}{\text{Total Keywords}} \right) \times 60$$
   This base is augmented by $+8$ for each matching custom priority, and $+5$ for each matched keyword verified via automated skill assessments.
-- **Stacked Availability Multiplier Heuristic**: Scales the base score downwards based on notice period, response rate, open-to-work flags, and interview completion rates:
-  - $\text{Last Active} > 180 \text{ days} \to \times 0.60$
-  - $\text{Not Open to Work} \to \times 0.80$
-  - $\text{Response Rate} < 20\% \to \times 0.70$
-  - $\text{Notice Period} > 90 \text{ days} \to \times 0.85$
-  - **Hard floor**: $0.40$ (prevents zeroing out outstanding profiles).
+- **Stacked Availability Multiplier Heuristic**: Scales the base score downwards based on behavioral signals from the 23-field Redrob schema:
+  - `last_active_date` > 180 days ago → ×0.60
+  - `last_active_date` 91–180 days ago → ×0.80
+  - `last_active_date` 31–90 days ago → ×0.90
+  - `open_to_work_flag = false` → ×0.80
+  - `recruiter_response_rate` < 20% → ×0.70
+  - `recruiter_response_rate` 20–49% → ×0.90
+  - `interview_completion_rate` < 50% → ×0.80
+  - `notice_period_days` > 90 → ×0.85
+  - `notice_period_days` 61–90 → ×0.92
+  - **Hard floor**: 0.40 (prevents zeroing out outstanding profiles).
 
 ---
 

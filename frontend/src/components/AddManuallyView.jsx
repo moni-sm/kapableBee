@@ -23,7 +23,7 @@ export const getAvatar = (name = '', index = 0) => {
 };
 
 const AddManuallyView = () => {
-  const { candidates, addManualCandidate, removeCandidate, runRanking } = useJob();
+  const { candidates, totalCandidatesCount, addManualCandidate, removeCandidate, runRanking } = useJob();
   
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
@@ -169,9 +169,9 @@ const AddManuallyView = () => {
       </div>
 
       <div id="ml-list">
-        {candidates.length > 0 && (
+        {totalCandidatesCount > 0 && (
           <div className="slbl" style={{ marginBottom: '10px' }}>
-            {candidates.length} candidate{candidates.length !== 1 ? 's' : ''} added
+            {totalCandidatesCount} candidate{totalCandidatesCount !== 1 ? 's' : ''} in pool (showing latest {candidates.length})
           </div>
         )}
         {candidates.map((c, i) => {
@@ -216,7 +216,7 @@ const AddManuallyView = () => {
         })}
       </div>
 
-      {candidates.length > 0 && (
+      {totalCandidatesCount > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '8px' }}>
           <button className="btn honey" onClick={runRanking}>
             <i className="ti ti-brain" aria-hidden="true"></i> Rank candidates ↗

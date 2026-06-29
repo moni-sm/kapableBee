@@ -186,14 +186,19 @@ class CandidateViewSet(viewsets.ViewSet):
         if candidates_collection is None:
             return Response({"error": "Database offline"}, status=503)
             
-        cands = list(candidates_collection.find())
+        total_count = candidates_collection.count_documents({})
+        cursor = candidates_collection.find().sort('_id', -1).limit(50)
+        cands = list(cursor)
         
         # Convert _id to string for serialization
         for c in cands:
             c['id'] = str(c['_id'])
             
         serializer = CandidateSerializer(cands, many=True)
-        return Response(serializer.data)
+        return Response({
+            "count": total_count,
+            "results": serializer.data
+        })
 
     def create(self, request):
         if candidates_collection is None:
@@ -206,6 +211,7 @@ class CandidateViewSet(viewsets.ViewSet):
             
             result = candidates_collection.insert_one(doc)
             doc['id'] = str(result.inserted_id)
+            doc.pop('_id', None)
             
             return Response(doc, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -229,6 +235,7 @@ class CandidateViewSet(viewsets.ViewSet):
                 result = candidates_collection.insert_many(docs)
                 for doc, inserted_id in zip(docs, result.inserted_ids):
                     doc['id'] = str(inserted_id)
+                    doc.pop('_id', None)
             
             return Response(docs, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -287,6 +294,7 @@ class JobViewSet(viewsets.ViewSet):
                 result = jobs_collection.insert_one(doc)
                 doc['id'] = str(result.inserted_id)
                 
+            doc.pop('_id', None)
             return Response(doc, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -600,8 +608,8 @@ class RankingView(APIView):
         if cands_payload:
             cands = list(cands_payload)
         elif candidates_collection is not None:
-            # Stream from MongoDB in cursor batches to keep RAM usage flat
-            cursor = candidates_collection.find(batch_size=5000)
+            # Limit to latest 20,000 candidates to prevent network timeouts in local dev environment
+            cursor = candidates_collection.find().sort('_id', -1).limit(20000)
             cands = []
             for doc in cursor:
                 doc['id'] = str(doc['_id'])
@@ -656,5 +664,5 @@ class RankingView(APIView):
         for i, item in enumerate(scored):
             item['rank'] = i + 1
 
-        return Response(scored, status=status.HTTP_200_OK)
+        return Response(scored[:1000], status=status.HTTP_200_OK)
 
