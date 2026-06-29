@@ -33,6 +33,7 @@ const JobDescriptionView = () => {
           <button className="pchip" id="preset-ds" onClick={() => applyPreset('ds')}>Data Scientist</button>
           <button className="pchip" id="preset-ml" onClick={() => applyPreset('ml')}>ML Engineer</button>
           <button className="pchip" id="preset-em" onClick={() => applyPreset('em')}>Eng Manager</button>
+          <button className="pchip" id="preset-ai-sr" onClick={() => applyPreset('ai_sr')} style={{ background: 'linear-gradient(135deg, #1a3a5c 0%, #0e2340 100%)', borderColor: '#378ADD', color: '#D4EEFF' }}>🤖 Senior AI Eng</button>
         </div>
       </div>
 

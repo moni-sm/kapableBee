@@ -33,6 +33,12 @@ const PRESETS = {
     company: 'SaaS unicorn',
     jd: `SaaS unicorn (Series D) hiring a technical EM for our 8-person core platform team. You'll write code, review designs, and grow engineers.\n\n- Lead 8 backend engineers\n- Drive technical roadmap\n- Hire and mentor team\n- Partner with product and design\n\n5+ years engineering, 2+ years management. Strong distributed systems background.`,
     priorities: 'technical depth, team building, distributed systems, product partnership'
+  },
+  ai_sr: {
+    title: 'Senior AI Engineer — Founding Team',
+    company: 'Redrob AI',
+    jd: `Redrob AI is hiring a Senior AI Engineer (founding team) to own our core retrieval and ranking intelligence layer — Pune/Noida, India (Hybrid).\n\nWe need someone who has shipped end-to-end semantic search or ranking systems to real users — not just run experiments.\n\nWhat you'll own:\n- Design and maintain embeddings-based retrieval pipelines (dense + hybrid search)\n- Own vector database architecture: Pinecone, Weaviate, Qdrant, Milvus, or Elasticsearch/OpenSearch\n- Build and improve ranking evaluation frameworks (NDCG, MRR, MAP)\n- Run rigorous A/B tests to improve retrieval quality\n- Partner with product to translate search quality wins into user-facing improvements\n\nWhat we need:\n- 5–9 years experience, ideally 6–8\n- Deep hands-on Python; sentence-transformers, FAISS, vector DBs\n- Real production deployments — no pure research backgrounds\n- Strong retrieval intuition; opinions on dense vs hybrid vs sparse search\n\nNice to have: LLM fine-tuning (LoRA/QLoRA/PEFT), learning-to-rank (LTR/XGBoost), HR-tech or recruiting-tech domain experience, open-source contributions.\n\nDisqualifiers: < 12 months total AI experience, career limited to IT services (TCS/Infosys/Wipro/Cognizant), primary domain is CV/speech/robotics with no NLP or IR, no production code in last 18 months.`,
+    priorities: 'retrieval systems, vector databases, embeddings, ranking evaluation, production AI, hybrid search'
   }
 };
 
@@ -108,6 +114,80 @@ const SAMPLES = [
     location: 'Chennai'
   }
 ];
+
+const getAvailabilityMultiplier = (signals) => {
+  if (!signals) return 1.0;
+  let multiplier = 1.0;
+  
+  const lastActive = signals.last_active_days;
+  if (lastActive !== undefined && lastActive !== null) {
+    if (lastActive > 180) multiplier *= 0.60;
+    else if (lastActive > 90) multiplier *= 0.80;
+    else if (lastActive > 30) multiplier *= 0.90;
+  }
+  
+  if (signals.open_to_work_flag === false) multiplier *= 0.80;
+  
+  const rrr = signals.recruiter_response_rate;
+  if (rrr !== undefined && rrr !== null) {
+    if (rrr < 0.20) multiplier *= 0.70;
+    else if (rrr < 0.50) multiplier *= 0.90;
+  }
+  
+  const icr = signals.interview_completion_rate;
+  if (icr !== undefined && icr !== null && icr < 0.50) multiplier *= 0.80;
+  
+  const notice = signals.notice_period_days;
+  if (notice !== undefined && notice !== null) {
+    if (notice > 90) multiplier *= 0.85;
+    else if (notice > 60) multiplier *= 0.92;
+  }
+  
+  return Math.max(0.40, multiplier);
+};
+
+const getSignalsScore = (signals, candSignalsText) => {
+  if (!signals) {
+    let sig = 55;
+    if (candSignalsText.includes('github') || candSignalsText.includes('stars')) sig += 15;
+    if (candSignalsText.includes('speaker') || candSignalsText.includes('talk') || candSignalsText.includes('conference')) sig += 15;
+    if (candSignalsText.includes('contribute') || candSignalsText.includes('open-source')) sig += 10;
+    return Math.min(96, sig);
+  }
+  
+  let score = 0;
+  
+  const githubScore = signals.github_activity_score !== undefined ? signals.github_activity_score : -1;
+  if (githubScore > 80) score += 30;
+  else if (githubScore > 50) score += 20;
+  else if (githubScore > 0) score += 10;
+  
+  const skillAssessments = signals.skill_assessment_scores;
+  if (skillAssessments) {
+    const values = Object.values(skillAssessments);
+    if (values.length > 0) {
+      const avg = values.reduce((sum, v) => sum + parseFloat(v), 0) / values.length;
+      score += Math.min(25, avg * 0.25);
+    }
+  }
+  
+  const endorsements = signals.endorsements_received || 0;
+  if (endorsements > 20) score += 15;
+  else if (endorsements > 10) score += 10;
+  else if (endorsements > 5) score += 5;
+  
+  const saved = signals.saved_by_recruiters_30d || 0;
+  if (saved > 5) score += 15;
+  else if (saved > 2) score += 8;
+  
+  const completeness = signals.profile_completeness_score || 0;
+  if (completeness > 85) score += 10;
+  else if (completeness > 60) score += 5;
+  
+  if (signals.linkedin_connected) score += 5;
+  
+  return Math.min(100, score);
+};
 
 export const JobProvider = ({ children }) => {
   const [jobTitle, setJobTitle] = useState('');
@@ -249,9 +329,8 @@ export const JobProvider = ({ children }) => {
     if (isAuthenticated) {
       // Save all sample candidates to backend MongoDB
       try {
-        const promises = SAMPLES.map(cand => API.post('candidates/', cand));
-        const resultsList = await Promise.all(promises);
-        const newCands = resultsList.map(res => res.data);
+        const res = await API.post('candidates/bulk/', SAMPLES);
+        const newCands = res.data;
         setCandidates(prev => [...prev, ...newCands]);
         setFiles(prev => [...prev, { name: 'sample_dataset', size: '12.4 KB', candidatesCount: SAMPLES.length }]);
         showToast('Sample dataset saved to server MongoDB');
@@ -308,12 +387,46 @@ export const JobProvider = ({ children }) => {
 
   const parseFile = async (name, text, size) => {
     let newCands = [];
-    if (name.endsWith('.json')) {
+    if (name.endsWith('.json') || name.endsWith('.jsonl')) {
       try {
-        const d = JSON.parse(text);
+        let d;
+        try {
+          d = JSON.parse(text);
+        } catch (jsonErr) {
+          // If standard JSON parsing fails, try parsing as JSON Lines (one JSON object per line)
+          const lines = text.trim().split('\n');
+          const parsedLines = lines.map(line => {
+            try {
+              const trimmedLine = line.trim();
+              return trimmedLine ? JSON.parse(trimmedLine) : null;
+            } catch (err) {
+              return null;
+            }
+          }).filter(Boolean);
+          
+          if (parsedLines.length > 0) {
+            d = parsedLines;
+          } else {
+            throw jsonErr; // rethrow standard JSON error if line-by-line parsing also failed
+          }
+        }
+
         const a = Array.isArray(d) ? d : (d.candidates || d.data || [d]);
         a.forEach((r) => {
-          if (r.name || r.Name) {
+          if (r.profile && (r.candidate_id || r.profile.anonymized_name)) {
+            // New schema format candidate
+            newCands.push({
+              candidate_id: r.candidate_id || '',
+              profile: r.profile,
+              career_history: r.career_history || [],
+              education: r.education || [],
+              skills: r.skills || [],
+              redrob_signals: r.redrob_signals || {},
+              certifications: r.certifications || [],
+              languages: r.languages || []
+            });
+          } else if (r.name || r.Name) {
+            // Legacy flat candidate
             newCands.push({
               name: r.name || r.Name,
               title: r.title || r.current_title || r.role || '',
@@ -322,7 +435,8 @@ export const JobProvider = ({ children }) => {
               skills: Array.isArray(r.skills) ? r.skills.join(', ') : (r.skills || r.tech_stack || ''),
               summary: r.summary || r.bio || r.description || '',
               signals: r.signals || r.github || '',
-              location: r.location || r.city || ''
+              location: r.location || r.city || '',
+              redrob_signals: r.redrob_signals || {}
             });
           }
         });
@@ -338,9 +452,8 @@ export const JobProvider = ({ children }) => {
     if (newCands.length > 0) {
       if (isAuthenticated) {
         try {
-          const promises = newCands.map(c => API.post('candidates/', c));
-          const responseList = await Promise.all(promises);
-          const savedCands = responseList.map(res => res.data);
+          const res = await API.post('candidates/bulk/', newCands);
+          const savedCands = res.data;
           setCandidates((prev) => [...prev, ...savedCands]);
           setFiles((prev) => [...prev, { name, size: `${(size / 1024).toFixed(1)} KB`, candidatesCount: savedCands.length }]);
           setResults([]);
@@ -435,12 +548,11 @@ export const JobProvider = ({ children }) => {
         const res = await API.post('rank/', {
           title: jobTitle,
           jd: jobDescription,
-          priorities: keyPriorities,
-          candidates: candidates
+          priorities: keyPriorities
         });
         setResults(res.data);
         setRankingState('completed');
-        showToast(`Successfully ranked ${candidates.length} candidates on server`);
+        showToast(`Successfully ranked ${res.data.length} candidates on server`);
       } catch (e) {
         console.error('Server side ranking failed:', e);
         setRankingState('failed');
@@ -456,7 +568,11 @@ export const JobProvider = ({ children }) => {
     const jdText = (jobTitle + ' ' + jobDescription + ' ' + keyPriorities).toLowerCase();
     
     let roleType = 'sde';
-    if (jdText.includes('product manager') || jdText.includes(' growth') || jdText.includes(' pm')) {
+    if (jdText.includes('embeddings') || jdText.includes('vector database') || jdText.includes('retrieval') ||
+        jdText.includes('pinecone') || jdText.includes('weaviate') || jdText.includes('qdrant') ||
+        jdText.includes('sentence-transformer') || jdText.includes('hybrid search') || jdText.includes('redrob')) {
+      roleType = 'ai_sr';
+    } else if (jdText.includes('product manager') || jdText.includes(' growth') || jdText.includes(' pm')) {
       roleType = 'pm';
     } else if (jdText.includes('data scientist') || jdText.includes('recommend') || jdText.includes('analytics')) {
       roleType = 'ds';
@@ -472,13 +588,50 @@ export const JobProvider = ({ children }) => {
       let trajectory = 50;
       let signalsCulture = 50;
       
-      const candSkills = (cand.skills + ' ' + cand.summary).toLowerCase();
-      const candTitle = cand.title.toLowerCase();
-      const candEdu = cand.edu.toLowerCase();
-      const candSignals = cand.signals.toLowerCase();
+      // Support both flat format and new structured schema
+      const profile = cand.profile || {};
+      const name = profile.anonymized_name || cand.name || 'Unknown';
+      const title = profile.current_title || cand.title || '';
       
-      let yoeVal = parseInt(cand.yoe);
+      let yoeVal = 5;
+      if (profile.years_of_experience !== undefined) {
+        yoeVal = parseInt(profile.years_of_experience);
+      } else if (cand.yoe !== undefined) {
+        yoeVal = parseInt(cand.yoe);
+      }
       if (isNaN(yoeVal)) yoeVal = 5;
+      
+      const location = profile.location || cand.location || '';
+      let summary = profile.summary || cand.summary || '';
+      if (profile.headline) {
+        summary = profile.headline + '. ' + summary;
+      }
+      
+      let skills = '';
+      if (Array.isArray(cand.skills)) {
+        skills = cand.skills.map(s => s.name || '').filter(Boolean).join(', ');
+      } else {
+        skills = cand.skills || '';
+      }
+      
+      let edu = '';
+      if (Array.isArray(cand.education)) {
+        edu = cand.education.map(e => `${e.institution || ''} ${e.degree || ''} ${e.field_of_study || ''} ${e.tier || ''}`).filter(Boolean).join(', ');
+      } else {
+        edu = cand.edu || '';
+      }
+      
+      let careerText = '';
+      if (Array.isArray(cand.career_history)) {
+        careerText = cand.career_history.map(job => `${job.title || ''} at ${job.company || ''} (${job.description || ''})`).join(' ');
+      }
+      
+      const redrobSignals = cand.redrob_signals || {};
+      
+      const candSkills = (skills + ' ' + summary + ' ' + careerText).toLowerCase();
+      const candTitle = (title + ' ' + careerText).toLowerCase();
+      const candEdu = edu.toLowerCase();
+      const candSignals = (cand.signals || '').toLowerCase();
 
       if (roleType === 'sde') {
         experienceFit = yoeVal >= 6 ? Math.min(95, 75 + (yoeVal - 6) * 3) : Math.max(30, yoeVal * 12);
@@ -490,6 +643,12 @@ export const JobProvider = ({ children }) => {
         experienceFit = yoeVal >= 3 ? 90 : 55;
       } else if (roleType === 'em') {
         experienceFit = yoeVal >= 8 ? Math.min(98, 70 + (yoeVal - 8) * 3) : Math.max(20, yoeVal * 7);
+      } else if (roleType === 'ai_sr') {
+        // Ideal band: 6–8 YOE; acceptable: 5–9
+        if (yoeVal >= 6 && yoeVal <= 8) experienceFit = 93;
+        else if (yoeVal === 5 || yoeVal === 9) experienceFit = 82;
+        else if (yoeVal > 9) experienceFit = 75;
+        else experienceFit = Math.max(30, yoeVal * 12);
       }
 
       const jdKeywords = {
@@ -497,7 +656,8 @@ export const JobProvider = ({ children }) => {
         pm: ['growth', 'experiments', 'funnel', 'metrics', 'wau', 'retention', 'a/b testing', 'consumer', 'analytics'],
         ds: ['recommend', 'sql', 'python', 'pytorch', 'tensorflow', 'marketplace', 'experimentation', 'two-tower', 'model'],
         ml: ['mlops', 'production', 'pytorch', 'inference', 'model', 'pipelines', 'latency', 'serving', 'gpu'],
-        em: ['lead', 'manage', 'mentor', 'team', 'roadmap', 'hiring', 'architecture', 'strategy', 'okr']
+        em: ['lead', 'manage', 'mentor', 'team', 'roadmap', 'hiring', 'architecture', 'strategy', 'okr'],
+        ai_sr: ['embeddings', 'retrieval', 'vector', 'sentence-transformers', 'pinecone', 'weaviate', 'qdrant', 'faiss', 'elasticsearch', 'hybrid search', 'ranking', 'ndcg', 'python', 'a/b testing']
       };
 
       const matchedSkills = jdKeywords[roleType].filter(kw => candSkills.includes(kw));
@@ -518,31 +678,72 @@ export const JobProvider = ({ children }) => {
       if (candTitle.includes('staff') || candTitle.includes('principal') || candTitle.includes('lead') || candTitle.includes('manager')) {
         trajectory += 20;
       }
-      if (candTitle.includes('startup') || cand.summary.toLowerCase().includes('startup') || cand.summary.toLowerCase().includes('scaled')) {
+      if (candTitle.includes('startup') || summary.toLowerCase().includes('startup') || summary.toLowerCase().includes('scaled')) {
         trajectory += 10;
       }
       if (candEdu.includes('iit') || candEdu.includes('iisc') || candEdu.includes('bits') || candEdu.includes('iim') || candEdu.includes('austin')) {
         trajectory += 10;
       }
-      trajectory = Math.min(98, trajectory);
+      // ai_sr: extra trajectory credit for search/IR/retrieval-specific shipping
+      if (roleType === 'ai_sr') {
+        if (candSkills.includes('search') || candSkills.includes('retrieval') || candSkills.includes('ranking')) trajectory += 10;
+        if (candSkills.includes('lora') || candSkills.includes('qlora') || candSkills.includes('peft') || candSkills.includes('fine-tun')) trajectory += 8;
+        if (candSkills.includes('learning-to-rank') || candSkills.includes('xgboost') || candSkills.includes('ltr')) trajectory += 7;
+        if (summary.toLowerCase().includes('hr') || summary.toLowerCase().includes('recruit')) trajectory += 6;
+        // Penalise disqualifying signals
+        if (candTitle.includes('tcs') || candTitle.includes('infosys') || candTitle.includes('wipro') ||
+            candTitle.includes('accenture') || candTitle.includes('cognizant') || candTitle.includes('capgemini')) trajectory -= 20;
+        if (candSkills.includes('computer vision') || candSkills.includes('speech recognition') || candSkills.includes('robotics')) trajectory -= 10;
+      }
+      trajectory = Math.min(98, Math.max(10, trajectory));
 
-      signalsCulture = 55;
-      if (candSignals.includes('github') || candSignals.includes('stars')) {
-        signalsCulture += 15;
-      }
-      if (candSignals.includes('speaker') || candSignals.includes('talk') || candSignals.includes('conference')) {
-        signalsCulture += 15;
-      }
-      if (candSignals.includes('contribute') || candSignals.includes('open-source')) {
-        signalsCulture += 10;
+      // 4. Compute signals score
+      signalsCulture = getSignalsScore(cand.redrob_signals && Object.keys(cand.redrob_signals).length > 0 ? cand.redrob_signals : null, candSignals);
+
+      // ai_sr text-based boosts (only when structured signals are absent)
+      if (roleType === 'ai_sr' && (!cand.redrob_signals || Object.keys(cand.redrob_signals).length === 0)) {
+        if (candSignals.includes('paper') || candSignals.includes('arxiv') || candSignals.includes('acl') || candSignals.includes('neurips')) signalsCulture = Math.min(96, signalsCulture + 12);
+        if (candSignals.includes('kaggle') && candSignals.includes('master')) signalsCulture = Math.min(96, signalsCulture + 8);
+        if (location && ['pune', 'noida', 'hyderabad', 'mumbai', 'delhi', 'ncr', 'bangalore'].some(c => location.toLowerCase().includes(c))) signalsCulture = Math.min(96, signalsCulture + 5);
       }
       signalsCulture = Math.min(96, signalsCulture);
+
+      // 5. Skills-match boost from verified assessment overlap
+      if (cand.redrob_signals && cand.redrob_signals.skill_assessment_scores) {
+        const assessedSkills = Object.keys(cand.redrob_signals.skill_assessment_scores).map(k => k.toLowerCase());
+        const boosted = matchedSkills.filter(kw => assessedSkills.includes(kw)).length;
+        skillsMatch = Math.min(100, skillsMatch + boosted * 5);
+      }
+
+      // 6. Availability multiplier (stacked, floor 0.40)
+      const availability = getAvailabilityMultiplier(cand.redrob_signals && Object.keys(cand.redrob_signals).length > 0 ? cand.redrob_signals : null);
 
       let greenFlags = [];
       let redFlags = [];
       let rationale = '';
 
-      if (cand.name === 'Arjun Mehta') {
+      // Dynamic flags from redrob_signals
+      if (cand.redrob_signals && Object.keys(cand.redrob_signals).length > 0) {
+        const otw = cand.redrob_signals.open_to_work_flag;
+        const rrr = cand.redrob_signals.recruiter_response_rate;
+        const icr = cand.redrob_signals.interview_completion_rate;
+        const notice = cand.redrob_signals.notice_period_days;
+        const offerAcc = cand.redrob_signals.offer_acceptance_rate;
+        const relocate = cand.redrob_signals.willing_to_relocate;
+
+        if (otw === false) redFlags.push('Not marked open to work');
+        if (rrr !== undefined && rrr !== null && rrr < 0.20) redFlags.push('Very low recruiter response rate');
+        if (notice !== undefined && notice !== null && notice > 90) redFlags.push(`Long notice period: ${notice} days`);
+        if (icr !== undefined && icr !== null && icr < 0.50) redFlags.push('Low interview completion rate');
+
+        if (otw === true) greenFlags.push('Actively open to work');
+        if (notice !== undefined && notice !== null && notice <= 30) greenFlags.push('Available immediately (≤30 day notice)');
+        if (rrr !== undefined && rrr !== null && rrr > 0.75) greenFlags.push('Highly responsive to recruiters');
+        if (offerAcc !== undefined && offerAcc !== null && offerAcc > 0.75) greenFlags.push('Strong offer acceptance history');
+        if (relocate === true) greenFlags.push('Willing to relocate');
+      }
+
+      if (name === 'Arjun Mehta') {
         if (roleType === 'sde') {
           experienceFit = 94; skillsMatch = 92; trajectory = 95; signalsCulture = 88;
           greenFlags = ['Highly scaled Swiggy systems (500K RPM)', 'Staff-level design & architecture', 'Mentorship of 6 engineers'];
@@ -556,7 +757,7 @@ export const JobProvider = ({ children }) => {
           redFlags = ['Overqualified/expensive for generalist scope', 'Focus is backend platform rather than growth/ML'];
           rationale = 'High-caliber platform engineer, but his deep distributed systems and scalability focus is not a direct fit for the requirements of this role.';
         }
-      } else if (cand.name === 'Priya Nair') {
+      } else if (name === 'Priya Nair') {
         if (roleType === 'ml' || roleType === 'ds') {
           experienceFit = 92; skillsMatch = 95; trajectory = 88; signalsCulture = 94;
           greenFlags = ['Kaggle Grandmaster status', 'Ola driver-matching model owner (+18% efficiency)', 'Active researcher & PyTorch contributor'];
@@ -566,7 +767,7 @@ export const JobProvider = ({ children }) => {
           redFlags = ['Heavy ML modeling focus; limited platform/general engineering', 'Primarily data/modeling background'];
           rationale = 'Excellent ML practitioner, but matches poorly with roles requiring standard product development or core database platform scaling.';
         }
-      } else if (cand.name === 'Kavya Reddy') {
+      } else if (name === 'Kavya Reddy') {
         if (roleType === 'em') {
           experienceFit = 96; skillsMatch = 94; trajectory = 96; signalsCulture = 90;
           greenFlags = ['EM leading 12 engineers at PhonePe', '99.99% uptime payments ownership', 'BITS Pilani + IIM Ahmedabad elite combo'];
@@ -579,7 +780,7 @@ export const JobProvider = ({ children }) => {
           experienceFit = 70; skillsMatch = 50; trajectory = 80; signalsCulture = 70;
           rationale = 'A high-performing manager with stellar background, but this specific role does not leverage her scaling or leadership strengths.';
         }
-      } else if (cand.name === 'Aisha Khan') {
+      } else if (name === 'Aisha Khan') {
         if (roleType === 'sde') {
           experienceFit = 91; skillsMatch = 89; trajectory = 88; signalsCulture = 90;
           greenFlags = ['Razorpay Core payments gateway engineer', 'Contributed to Go standard library', '35% reduction in fraud metrics'];
@@ -588,7 +789,7 @@ export const JobProvider = ({ children }) => {
           experienceFit = 80; skillsMatch = 70; trajectory = 80; signalsCulture = 80;
           rationale = 'Highly solid senior developer with payment domain context. Strong system logic foundations.';
         }
-      } else if (cand.name === 'Siddharth Rao') {
+      } else if (name === 'Siddharth Rao') {
         if (roleType === 'em' || roleType === 'sde') {
           experienceFit = 93; skillsMatch = 88; trajectory = 92; signalsCulture = 85;
           greenFlags = ['Principal Engineer leading SaaS vision', '13 years of SaaS & multi-tenant architecture', 'US experience (UT Austin MS)'];
@@ -598,7 +799,7 @@ export const JobProvider = ({ children }) => {
           redFlags = ['SaaS focus; lacks specific consumer PM/DS modeling skills'];
           rationale = 'Vast engineering experience, but his core skills skew too heavily toward architectural engineering and SaaS multi-tenancy for this position.';
         }
-      } else if (cand.name === 'Rohan Gupta') {
+      } else if (name === 'Rohan Gupta') {
         experienceFit = 55; skillsMatch = 65; trajectory = 60; signalsCulture = 65;
         if (roleType === 'pm') {
           greenFlags = ['Shipped 3 SaaS startup features end-to-end', 'High agency fast learner'];
@@ -609,7 +810,7 @@ export const JobProvider = ({ children }) => {
           redFlags = ['Limited high-scale distributed systems background', 'Low total years of experience (3 YOE)'];
           rationale = 'Highly promising junior-to-mid developer with good startup hustle. Lacks the depth in distributed scaling, event buses, or systems complexity for this Senior level.';
         }
-      } else if (cand.name === 'Nikhil Joshi') {
+      } else if (name === 'Nikhil Joshi') {
         experienceFit = 55; skillsMatch = 50; trajectory = 45; signalsCulture = 45;
         redFlags = ['IT Services background (TCS) - slower pace', 'No product/startup experience', 'Basic AWS only'];
         rationale = 'Solid enterprise developer. Shows consistency at TCS, but lacks the high-velocity startup exposure, product iteration cycles, or advanced system designs required here.';
@@ -617,24 +818,29 @@ export const JobProvider = ({ children }) => {
         const calculatedScore = Math.round((experienceFit * 0.35) + (skillsMatch * 0.35) + (trajectory * 0.15) + (signalsCulture * 0.15));
         
         if (calculatedScore > 85) {
-          greenFlags = [`Excellent profile with ${cand.yoe} YOE`, `Strong match for key skills: ${cand.skills.split(',').slice(0, 3).join(', ')}`];
+          greenFlags = greenFlags.length > 0 ? greenFlags : [`Excellent profile with ${yoeVal} YOE`, `Strong match for key skills: ${skills ? skills.split(',').slice(0, 3).join(', ') : 'None'}`];
           rationale = `Highly qualified candidate. Excellent alignment on background and experience. Strong signals match the priorities for ${jobTitle || 'the role'}.`;
         } else if (calculatedScore > 70) {
-          greenFlags = [`Solid ${cand.yoe} YOE background`];
-          redFlags = [`May need ramp-up on specific tech stack elements`];
+          greenFlags = greenFlags.length > 0 ? greenFlags : [`Solid ${yoeVal} YOE background`];
+          redFlags = redFlags.length > 0 ? redFlags : [`May need ramp-up on specific tech stack elements`];
           rationale = `Good candidate with relevant background. Exhibits standard technical competency, though some secondary skill areas may need closer vetting.`;
         } else {
-          redFlags = [`Limited alignment on key domain experiences`, `Lower match on tech stack requirements`];
+          redFlags = redFlags.length > 0 ? redFlags : [`Limited alignment on key domain experiences`, `Lower match on tech stack requirements`];
           rationale = `Lacks the core technical depth or specific framework scaling expertise outlined in the job description. Trajectory is slightly off-course for this scope.`;
         }
       }
 
-      const overall_score = Math.round((experienceFit * 0.35) + (skillsMatch * 0.35) + (trajectory * 0.15) + (signalsCulture * 0.15));
+      const overall_score = Math.round(((experienceFit * 0.35) + (skillsMatch * 0.35) + (trajectory * 0.15) + (signalsCulture * 0.15)) * availability);
 
       return {
-        name: cand.name,
-        title: cand.title,
+        name: name,
+        title: title,
+        yoe: yoeVal,
+        location: location,
+        skills: skills,
+        education: edu,
         overall_score,
+        availability_multiplier: Math.round(availability * 100) / 100,
         dimensions: {
           experience_fit: Math.round(experienceFit),
           skills_match: Math.round(skillsMatch),
@@ -643,7 +849,7 @@ export const JobProvider = ({ children }) => {
         },
         green_flags: greenFlags.length > 0 ? greenFlags : ['Competent career history', 'Decent skill alignment'],
         red_flags: redFlags,
-        rationale: rationale || `Evaluated candidate based on skills (${cand.skills}) and trajectory. Overall score matches general fit.`
+        rationale: rationale || `Evaluated candidate based on skills (${skills}) and trajectory. Overall score matches general fit.`
       };
     });
 
