@@ -1,0 +1,162 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+from pymongo import MongoClient, ASCENDING
+
+uri = os.getenv('MONGODB_URI')
+db_name = os.getenv('MONGODB_DB', 'kapablebee')
+client = MongoClient(uri, serverSelectionTimeoutMS=8000)
+db = client[db_name]
+candidates_collection = db['candidates']
+
+# Ensure the unique sparse index on candidate_id
+candidates_collection.create_index(
+    [('candidate_id', ASCENDING)],
+    unique=True,
+    sparse=True,
+    name='candidate_id_unique'
+)
+print('Index ensured.')
+
+# Full Redrob-schema document for Ira Vora
+doc = {
+    'candidate_id': 'CAND_0000001',
+    'user_id': 'default',
+    'profile': {
+        'anonymized_name': 'Ira Vora',
+        'headline': 'Backend Engineer | SQL, Spark, Cloud',
+        'summary': (
+            'Software / data professional with 6.9 years of experience building '
+            'data pipelines, backend systems, and analytics infrastructure. '
+            "I'm a backend/data hybrid — Spark, Airflow, SQL warehouses are home "
+            "territory; I'm building competence on the ML side."
+        ),
+        'location': 'Toronto',
+        'country': 'Canada',
+        'years_of_experience': 6.9,
+        'current_title': 'Backend Engineer',
+        'current_company': 'Mindtree',
+        'current_company_size': '10001+',
+        'current_industry': 'IT Services',
+    },
+    'career_history': [
+        {
+            'company': 'Mindtree',
+            'title': 'Backend Engineer',
+            'start_date': '2024-03-08',
+            'end_date': None,
+            'duration_months': 27,
+            'is_current': True,
+            'industry': 'IT Services',
+            'company_size': '10001+',
+            'description': (
+                'Implemented streaming data pipelines on Kafka and Spark Streaming '
+                'for a real-time user-activity processing platform.'
+            ),
+        },
+        {
+            'company': 'Dunder Mifflin',
+            'title': 'Analytics Engineer',
+            'start_date': '2019-07-03',
+            'end_date': '2024-01-08',
+            'duration_months': 55,
+            'is_current': False,
+            'industry': 'Paper Products',
+            'company_size': '201-500',
+            'description': (
+                'Built and maintained data pipelines on Apache Airflow processing '
+                '~500GB of daily transactional data across 12 source systems.'
+            ),
+        },
+    ],
+    'education': [
+        {
+            'institution': 'Lovely Professional University',
+            'degree': 'B.E.',
+            'field_of_study': 'Computer Science',
+            'start_year': 2017,
+            'end_year': 2020,
+            'grade': '8.24 CGPA',
+            'tier': 'tier_3',
+        }
+    ],
+    'skills': [
+        {'name': 'Tailwind',          'proficiency': 'intermediate', 'endorsements': 3,  'duration_months': 13},
+        {'name': 'NLP',               'proficiency': 'advanced',     'endorsements': 37, 'duration_months': 26},
+        {'name': 'Image Classification','proficiency': 'advanced',   'endorsements': 7,  'duration_months': 40},
+        {'name': 'Fine-tuning LLMs',  'proficiency': 'advanced',     'endorsements': 21, 'duration_months': 36},
+        {'name': 'Weights & Biases',  'proficiency': 'intermediate', 'endorsements': 13, 'duration_months': 30},
+        {'name': 'Speech Recognition','proficiency': 'advanced',     'endorsements': 52, 'duration_months': 33},
+        {'name': 'Photoshop',         'proficiency': 'intermediate', 'endorsements': 8,  'duration_months': 24},
+        {'name': 'TTS',               'proficiency': 'advanced',     'endorsements': 56, 'duration_months': 60},
+        {'name': 'LoRA',              'proficiency': 'intermediate', 'endorsements': 0,  'duration_months': 28},
+        {'name': 'Apache Beam',       'proficiency': 'intermediate', 'endorsements': 4,  'duration_months': 9},
+        {'name': 'AWS',               'proficiency': 'beginner',     'endorsements': 5,  'duration_months': 8},
+        {'name': 'Flask',             'proficiency': 'beginner',     'endorsements': 15, 'duration_months': 15},
+        {'name': 'BentoML',           'proficiency': 'intermediate', 'endorsements': 3,  'duration_months': 36},
+        {'name': 'Milvus',            'proficiency': 'advanced',     'endorsements': 40, 'duration_months': 35},
+        {'name': 'GANs',              'proficiency': 'advanced',     'endorsements': 12, 'duration_months': 19},
+        {'name': 'Statistical Modeling','proficiency': 'intermediate','endorsements': 9, 'duration_months': 8},
+        {'name': 'GCP',               'proficiency': 'beginner',     'endorsements': 7,  'duration_months': 2},
+    ],
+    'certifications': [],
+    'languages': [
+        {'language': 'English', 'proficiency': 'professional'},
+        {'language': 'Hindi',   'proficiency': 'conversational'},
+    ],
+    'redrob_signals': {
+        'profile_completeness_score': 86.9,
+        'signup_date': '2025-10-16',
+        'last_active_date': '2026-05-20',
+        'open_to_work_flag': True,
+        'profile_views_received_30d': 23,
+        'applications_submitted_30d': 2,
+        'recruiter_response_rate': 0.34,
+        'avg_response_time_hours': 177.8,
+        'skill_assessment_scores': {
+            'NLP': 38.8,
+            'Image Classification': 64.8,
+            'Fine-tuning LLMs': 41.6,
+            'Speech Recognition': 53.7,
+        },
+        'connection_count': 356,
+        'endorsements_received': 35,
+        'notice_period_days': 60,
+        'expected_salary_range_inr_lpa': {'min': 18.7, 'max': 36.1},
+        'preferred_work_mode': 'onsite',
+        'willing_to_relocate': False,
+        'github_activity_score': 9.2,
+        'search_appearance_30d': 249,
+        'saved_by_recruiters_30d': 4,
+        'interview_completion_rate': 0.71,
+        'offer_acceptance_rate': 0.58,
+        'verified_email': True,
+        'verified_phone': True,
+        'linkedin_connected': False,
+    },
+}
+
+# Upsert
+result = candidates_collection.update_one(
+    {'candidate_id': 'CAND_0000001'},
+    {'$set': doc},
+    upsert=True
+)
+
+if result.upserted_id:
+    print('Action : CREATED (new document inserted)')
+    print('_id    :', result.upserted_id)
+else:
+    print('Action  : UPDATED (existing document)')
+    print('Matched :', result.matched_count, '| Modified:', result.modified_count)
+
+# Verify
+saved = candidates_collection.find_one({'candidate_id': 'CAND_0000001'})
+print()
+print('Saved doc top-level keys :', list(saved.keys()))
+print('Name                     :', saved['profile']['anonymized_name'])
+print('Skills count             :', len(saved['skills']))
+print('Career entries           :', len(saved['career_history']))
+print('Education entries        :', len(saved['education']))
+print('redrob_signals keys      :', list(saved['redrob_signals'].keys()))

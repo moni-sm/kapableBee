@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useJob } from '../context/JobContext';
 
 const UploadDatasetView = () => {
-  const { files, parseFile, loadSampleDataset, runRanking, uploadState, uploadProgress } = useJob();
+  const { files, parseFile, runRanking, uploadState, uploadProgress } = useJob();
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -160,26 +160,6 @@ const UploadDatasetView = () => {
         ))}
       </div>
 
-      <div style={{ paddingTop: '16px', borderTop: '0.5px solid var(--color-border-tertiary)', marginTop: '8px' }}>
-        <div className="slbl">Built-in sample dataset</div>
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px', borderColor: '#D4EEFF', background: '#EAF5FF' }}>
-          <svg width="30" height="30" viewBox="0 0 56 56" fill="none" style={{ flexShrink: 0 }} aria-hidden="true">
-            <ellipse cx="28" cy="34" rx="14" ry="17" fill="#F5A623"/>
-            <rect x="15" y="27" width="26" height="5" rx="2.5" fill="#1A1A1A" opacity="0.14"/>
-            <rect x="15" y="36" width="26" height="5" rx="2.5" fill="#1A1A1A" opacity="0.14"/>
-            <ellipse cx="15" cy="22" rx="9" ry="5.5" fill="#D4EEFF" transform="rotate(-22 15 22)"/>
-            <ellipse cx="41" cy="22" rx="9" ry="5.5" fill="#D4EEFF" transform="rotate(22 41 22)"/>
-            <ellipse cx="28" cy="17" rx="6.5" ry="6" fill="#F5A623"/>
-          </svg>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#0C1A2E' }}>7 Indian tech candidates</div>
-            <div style={{ fontSize: '11px', color: '#378ADD', marginTop: '2px' }}>Swiggy · Razorpay · PhonePe · Ola · Freshworks</div>
-          </div>
-          <button className="btn honey" onClick={loadSampleDataset} style={{ padding: '5px 12px', fontSize: '12px' }} disabled={uploadState !== 'idle'}>
-            <i className="ti ti-sparkles" aria-hidden="true"></i> Load
-          </button>
-        </div>
-      </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px' }}>
         <button className="btn honey" onClick={runRanking} disabled={uploadState !== 'idle'}>

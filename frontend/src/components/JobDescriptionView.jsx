@@ -26,16 +26,19 @@ const JobDescriptionView = () => {
   return (
     <div id="v-jd" className="view-content">
       <div className="f animate-fade-in">
-        <div className="slbl">Quick presets</div>
+        <div className="slbl">Quick preset</div>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button className="pchip" id="preset-sde" onClick={() => applyPreset('sde')}>Senior SDE</button>
-          <button className="pchip" id="preset-pm" onClick={() => applyPreset('pm')}>Product Manager</button>
-          <button className="pchip" id="preset-ds" onClick={() => applyPreset('ds')}>Data Scientist</button>
-          <button className="pchip" id="preset-ml" onClick={() => applyPreset('ml')}>ML Engineer</button>
-          <button className="pchip" id="preset-em" onClick={() => applyPreset('em')}>Eng Manager</button>
-          <button className="pchip" id="preset-ai-sr" onClick={() => applyPreset('ai_sr')} style={{ background: 'linear-gradient(135deg, #1a3a5c 0%, #0e2340 100%)', borderColor: '#378ADD', color: '#D4EEFF' }}>🤖 Senior AI Eng</button>
+          <button
+            className="pchip"
+            id="preset-ai-sr"
+            onClick={() => applyPreset('ai_sr')}
+            style={{ background: 'linear-gradient(135deg, #1a3a5c 0%, #0e2340 100%)', borderColor: '#378ADD', color: '#D4EEFF' }}
+          >
+            🤖 Senior AI Engineer — Redrob AI
+          </button>
         </div>
       </div>
+
 
       <div className="g2">
         <div className="f">

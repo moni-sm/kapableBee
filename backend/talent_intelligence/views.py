@@ -39,12 +39,47 @@ MAX_WORKERS = 4
 
 
 # ---------------------------------------------------------------------------
-# Availability multiplier — stacks all behavioural signals, floor 0.40
+# Helpers
+# ---------------------------------------------------------------------------
+def _days_since(date_str):
+    """
+    Parse an ISO date string (YYYY-MM-DD or datetime) and return days since today.
+    Returns None on any parse failure.
+    """
+    if not date_str:
+        return None
+    from datetime import date
+    try:
+        if isinstance(date_str, str):
+            d = date.fromisoformat(date_str[:10])
+        else:
+            d = date_str.date() if hasattr(date_str, 'date') else None
+        if d is None:
+            return None
+        return (date.today() - d).days
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Availability multiplier  (floor 0.40)
+# ---------------------------------------------------------------------------
+# Applied as a GLOBAL multiplier on the final composite score so that an
+# unavailable candidate is down-weighted regardless of their skill fit —
+# matching the JD's explicit instruction.
+#
+# Signal groups covered:
+#   Availability / activity  : last_active_date, open_to_work_flag,
+#                              recruiter_response_rate, avg_response_time_hours,
+#                              applications_submitted_30d
+#   Reliability / follow-thru: interview_completion_rate, offer_acceptance_rate
+#                              (sentinel -1 = no prior offers → neutral)
+#   Fit / logistics           : notice_period_days
 # ---------------------------------------------------------------------------
 def compute_availability_multiplier(signals):
     """
-    Multiplies together all availability-related signal factors.
-    Each missing signal contributes 1.0 (no penalty).
+    Stacks multiplicative penalties from all availability/reliability signals.
+    Missing or sentinel (-1) values contribute 1.0 (no penalty).
     Hard floor at 0.40 to avoid zeroing out strong technical candidates.
     """
     if not signals:
@@ -52,116 +87,217 @@ def compute_availability_multiplier(signals):
 
     multiplier = 1.0
 
-    # last_active_days: integer days since last platform activity
-    last_active = signals.get('last_active_days')
-    if last_active is not None:
-        if last_active > 180:
-            multiplier *= 0.60
-        elif last_active > 90:
-            multiplier *= 0.80
-        elif last_active > 30:
-            multiplier *= 0.90
-        # <= 30 days (recent) -> 1.0
+    # ── last_active_date (preferred) or last_active_days (legacy int) ──────
+    last_active_days = signals.get('last_active_days')          # legacy int field
+    if last_active_days is None:
+        last_active_days = _days_since(signals.get('last_active_date'))  # new date string
+    if last_active_days is not None:
+        if last_active_days > 180:   multiplier *= 0.55   # 6+ months dark
+        elif last_active_days > 90:  multiplier *= 0.78   # 3–6 months
+        elif last_active_days > 30:  multiplier *= 0.92   # 1–3 months
+        # <= 30 days (recent) → 1.0
 
-    # open_to_work_flag
-    if signals.get('open_to_work_flag') is False:
+    # ── open_to_work_flag ──────────────────────────────────────────────────
+    otw = signals.get('open_to_work_flag')
+    if otw is False:
         multiplier *= 0.80
+    # True or missing → 1.0
 
-    # recruiter_response_rate  [0.0, 1.0]
+    # ── recruiter_response_rate [0.0, 1.0] ─────────────────────────────────
     rrr = signals.get('recruiter_response_rate')
     if rrr is not None:
-        if rrr < 0.20:
-            multiplier *= 0.70
-        elif rrr < 0.50:
-            multiplier *= 0.90
-        # >= 0.50 -> 1.0
+        if rrr < 0.10:    multiplier *= 0.60   # nearly unresponsive
+        elif rrr < 0.20:  multiplier *= 0.72
+        elif rrr < 0.40:  multiplier *= 0.88
+        # >= 0.40 → 1.0
 
-    # interview_completion_rate  [0.0, 1.0]
+    # ── avg_response_time_hours ────────────────────────────────────────────
+    rth = signals.get('avg_response_time_hours')
+    if rth is not None:
+        if rth > 168:    multiplier *= 0.88   # > 1 week
+        elif rth > 72:   multiplier *= 0.95   # > 3 days
+        # <= 72 h → 1.0
+
+    # ── applications_submitted_30d (proxy for active job search) ───────────
+    apps = signals.get('applications_submitted_30d')
+    if apps is not None and apps == 0:
+        multiplier *= 0.93   # on platform but not applying
+
+    # ── interview_completion_rate [0.0, 1.0] ───────────────────────────────
     icr = signals.get('interview_completion_rate')
-    if icr is not None and icr < 0.50:
-        multiplier *= 0.80
+    if icr is not None:
+        if icr < 0.30:   multiplier *= 0.72
+        elif icr < 0.50: multiplier *= 0.88
+        # >= 0.50 → 1.0
 
-    # notice_period_days
+    # ── offer_acceptance_rate  [-1, 1.0] ───────────────────────────────────
+    # SENTINEL: -1 means "no prior offers" → treat as neutral, NOT a penalty.
+    oa = signals.get('offer_acceptance_rate')
+    if oa is not None and oa != -1:
+        if oa < 0.30:    multiplier *= 0.82   # frequently declines offers
+        elif oa < 0.50:  multiplier *= 0.93
+        # >= 0.50 or -1 sentinel → 1.0
+
+    # ── notice_period_days ─────────────────────────────────────────────────
     notice = signals.get('notice_period_days')
     if notice is not None:
-        if notice > 90:
-            multiplier *= 0.85
-        elif notice > 60:
-            multiplier *= 0.92
-        # <= 60 -> 1.0
+        if notice > 90:  multiplier *= 0.82
+        elif notice > 60: multiplier *= 0.91
+        elif notice > 30: multiplier *= 0.97
+        # <= 30 (JD preference) → 1.0
+
+    # ── preferred_work_mode (onsite/hybrid/remote/flexible) ────────────────
+    # Remote-only preference adds friction for roles that require some presence.
+    # 'flexible', 'hybrid', 'onsite', or missing → neutral (1.0)
+    work_mode = (signals.get('preferred_work_mode') or '').lower()
+    if work_mode == 'remote':
+        multiplier *= 0.96   # mild penalty — most senior engineering roles are hybrid+
+    # all other values → 1.0
+
+    # ── willing_to_relocate ────────────────────────────────────────────────
+    # Compound penalty when candidate is both not open to work AND won't relocate.
+    relocate = signals.get('willing_to_relocate')
+    otw_flag  = signals.get('open_to_work_flag')
+    if relocate is False and otw_flag is False:
+        multiplier *= 0.92   # doubly unavailable: not looking + geographically rigid
+    elif relocate is False:
+        multiplier *= 0.97   # willing to work but won't relocate
+    # True or missing → 1.0
+
+    # ── expected_salary_range_inr_lpa ──────────────────────────────────────
+    # Malformed data (min > max) or an extremely compressed range signals
+    # unrealistic expectations, which correlates with offer-stage drop-offs.
+    sal = signals.get('expected_salary_range_inr_lpa') or {}
+    sal_min = sal.get('min')
+    sal_max = sal.get('max')
+    if sal_min is not None and sal_max is not None:
+        try:
+            sal_min, sal_max = float(sal_min), float(sal_max)
+            if sal_min > sal_max:   # inverted range = data integrity issue
+                multiplier *= 0.97
+            elif sal_min > 200:     # > 200 LPA floor = very senior/overqualified risk
+                multiplier *= 0.95
+        except (TypeError, ValueError):
+            pass
 
     return max(0.40, multiplier)
 
 
 # ---------------------------------------------------------------------------
-# Structured signals score  (0 – 100)
+# Signals & Culture dimension score  (0 – 100)
+# ---------------------------------------------------------------------------
+# This is the FOURTH scoring dimension — it feeds into the weighted composite.
+# It covers external validation, skill credibility, and market demand signals.
+#
+# Signal groups covered:
+#   Skill validation  : skill_assessment_scores (corroborates/contradicts resume),
+#                       github_activity_score (sentinel -1 = no GitHub → neutral)
+#   Market demand     : profile_views_received_30d, search_appearance_30d,
+#                       saved_by_recruiters_30d, connection_count,
+#                       endorsements_received
+#   Trust/verification: verified_email, verified_phone, linkedin_connected
+#   Profile quality   : profile_completeness_score
 # ---------------------------------------------------------------------------
 def compute_signals_score(signals, cand_signals_text=''):
     """
-    Computes a 0-100 signals score from redrob_signals dict.
+    Computes the Signals & Culture dimension score (0–100) from redrob_signals.
     Falls back to legacy text heuristics when structured data is absent.
     """
     if not signals:
-        # Legacy text-based fallback (unchanged behaviour for existing candidates)
-        sig = 55
+        # ── Legacy text-based fallback for old flat-schema candidates ────────
+        sig = 50
         if 'github' in cand_signals_text or 'stars' in cand_signals_text:
             sig += 15
-        if any(k in cand_signals_text for k in ['speaker', 'talk', 'conference']):
-            sig += 15
+        if any(k in cand_signals_text for k in ('speaker', 'talk', 'conference')):
+            sig += 12
         if 'contribute' in cand_signals_text or 'open-source' in cand_signals_text:
+            sig += 10
+        if 'kaggle' in cand_signals_text:
+            sig += 8
+        if any(k in cand_signals_text for k in ('paper', 'arxiv', 'acl', 'neurips', 'sigir')):
             sig += 10
         return min(96, sig)
 
     score = 0
 
-    # github_activity_score  -> max 30 pts
-    github_score = signals.get('github_activity_score', -1)
-    if github_score > 80:
-        score += 30
-    elif github_score > 50:
-        score += 20
-    elif github_score > 0:
-        score += 10
+    # ── Skill validation (corroborates / contradicts resume) ────────────────
 
-    # skill_assessment_scores: avg(all values) * 0.25  -> max 25 pts
-    skill_assessments = signals.get('skill_assessment_scores')
-    if skill_assessments:
-        if isinstance(skill_assessments, dict):
-            values = list(skill_assessments.values())
-        elif isinstance(skill_assessments, list):
-            values = skill_assessments
+    # github_activity_score → max 25 pts
+    # SENTINEL: -1 means no GitHub linked → neutral (0 pts), not a penalty
+    github = signals.get('github_activity_score', -1)
+    if github == -1 or github is None:   pass           # no data → neutral
+    elif github > 80:   score += 25
+    elif github > 60:   score += 18
+    elif github > 40:   score += 12
+    elif github > 15:   score += 6
+    # <= 15 (barely active) → 0 pts
+
+    # skill_assessment_scores: avg of all assessed skills → max 30 pts
+    sas = signals.get('skill_assessment_scores')
+    if sas:
+        if isinstance(sas, dict):
+            values = [float(v) for v in sas.values()]
+        elif isinstance(sas, list):
+            values = [float(v) for v in sas]
         else:
             values = []
         if values:
-            avg = sum(float(v) for v in values) / len(values)
-            score += min(25, avg * 0.25)
+            avg = sum(values) / len(values)
+            score += min(30, round(avg * 0.30))  # 100-pt test → 30 pts
 
-    # endorsements_received  -> max 15 pts
+    # ── Market demand (do other recruiters value this person?) ───────────────
+
+    # endorsements_received → max 12 pts
     endorsements = signals.get('endorsements_received', 0)
-    if endorsements > 20:
-        score += 15
-    elif endorsements > 10:
-        score += 10
-    elif endorsements > 5:
-        score += 5
+    if endorsements > 50:    score += 12
+    elif endorsements > 25:  score += 8
+    elif endorsements > 10:  score += 5
+    elif endorsements > 3:   score += 2
 
-    # saved_by_recruiters_30d  -> max 15 pts
+    # saved_by_recruiters_30d → max 10 pts
     saved = signals.get('saved_by_recruiters_30d', 0)
-    if saved > 5:
-        score += 15
-    elif saved > 2:
-        score += 8
+    if saved > 8:    score += 10
+    elif saved > 4:  score += 6
+    elif saved > 1:  score += 3
 
-    # profile_completeness_score  -> max 10 pts
+    # profile_views_received_30d → max 5 pts
+    views = signals.get('profile_views_received_30d', 0)
+    if views > 40:   score += 5
+    elif views > 15: score += 3
+
+    # search_appearance_30d → max 4 pts
+    appear = signals.get('search_appearance_30d', 0)
+    if appear > 300: score += 4
+    elif appear > 100: score += 2
+
+    # connection_count → max 3 pts
+    conns = signals.get('connection_count', 0)
+    if conns > 500:  score += 3
+    elif conns > 200: score += 1
+
+    # ── Profile quality ─────────────────────────────────────────────────────
+
+    # profile_completeness_score → max 8 pts
     completeness = signals.get('profile_completeness_score', 0)
-    if completeness > 85:
-        score += 10
-    elif completeness > 60:
-        score += 5
+    if completeness > 90:    score += 8
+    elif completeness > 75:  score += 5
+    elif completeness > 55:  score += 2
 
-    # linkedin_connected  -> max 5 pts
-    if signals.get('linkedin_connected', False):
-        score += 5
+    # ── Trust / verification (low signal individually, gate-useful) ──────────
+    trust = 0
+    if signals.get('verified_email', False):   trust += 1
+    if signals.get('verified_phone', False):   trust += 1
+    if signals.get('linkedin_connected', False): trust += 3   # stronger signal
+    score += trust
+
+    # ── Platform tenure via signup_date → max 3 pts ─────────────────────────
+    # Longer on the platform = more invested, more data for scoring reliability.
+    signup_days = _days_since(signals.get('signup_date'))
+    if signup_days is not None:
+        if signup_days > 365:    score += 3   # > 1 year: established member
+        elif signup_days > 180:  score += 2   # 6–12 months
+        elif signup_days > 90:   score += 1   # 3–6 months
+        # < 90 days (brand new) → 0 pts
 
     return min(100, score)
 
@@ -205,16 +341,40 @@ class CandidateViewSet(viewsets.ViewSet):
             return Response({"error": "Database offline"}, status=503)
 
         serializer = CandidateSerializer(data=request.data)
-        if serializer.is_valid():
-            doc = serializer.validated_data
-            doc['user_id'] = 'default'
-            
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        doc = serializer.validated_data
+        doc['user_id'] = 'default'
+
+        candidate_id = doc.get('candidate_id')
+
+        if candidate_id:
+            # Upsert: update the existing document or create a new one
+            result = candidates_collection.update_one(
+                {'candidate_id': candidate_id},
+                {'$set': doc},
+                upsert=True
+            )
+            if result.upserted_id:
+                doc['id'] = str(result.upserted_id)
+                action = 'created'
+                http_status = status.HTTP_201_CREATED
+            else:
+                existing = candidates_collection.find_one({'candidate_id': candidate_id})
+                doc['id'] = str(existing['_id']) if existing else candidate_id
+                action = 'updated'
+                http_status = status.HTTP_200_OK
+        else:
+            # No candidate_id — plain insert
             result = candidates_collection.insert_one(doc)
             doc['id'] = str(result.inserted_id)
-            doc.pop('_id', None)
-            
-            return Response(doc, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            action = 'created'
+            http_status = status.HTTP_201_CREATED
+
+        doc.pop('_id', None)
+        doc['_action'] = action
+        return Response(doc, status=http_status)
 
     @action(detail=False, methods=['post'], url_path='bulk')
     def bulk_create(self, request):
@@ -226,19 +386,44 @@ class CandidateViewSet(viewsets.ViewSet):
             data = [data]
 
         serializer = CandidateSerializer(data=data, many=True)
-        if serializer.is_valid():
-            docs = serializer.validated_data
-            for doc in docs:
-                doc['user_id'] = 'default'
-            
-            if docs:
-                result = candidates_collection.insert_many(docs)
-                for doc, inserted_id in zip(docs, result.inserted_ids):
-                    doc['id'] = str(inserted_id)
-                    doc.pop('_id', None)
-            
-            return Response(docs, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        docs = serializer.validated_data
+        output = []
+
+        for doc in docs:
+            doc['user_id'] = 'default'
+            candidate_id = doc.get('candidate_id')
+
+            if candidate_id:
+                # Upsert by candidate_id
+                result = candidates_collection.update_one(
+                    {'candidate_id': candidate_id},
+                    {'$set': doc},
+                    upsert=True
+                )
+                if result.upserted_id:
+                    doc['id'] = str(result.upserted_id)
+                    doc['_action'] = 'created'
+                else:
+                    existing = candidates_collection.find_one({'candidate_id': candidate_id})
+                    doc['id'] = str(existing['_id']) if existing else candidate_id
+                    doc['_action'] = 'updated'
+            else:
+                result = candidates_collection.insert_one(doc)
+                doc['id'] = str(result.inserted_id)
+                doc['_action'] = 'created'
+
+            doc.pop('_id', None)
+            output.append(doc)
+
+        created = sum(1 for d in output if d.get('_action') == 'created')
+        updated = sum(1 for d in output if d.get('_action') == 'updated')
+        return Response(
+            {'created': created, 'updated': updated, 'results': output},
+            status=status.HTTP_200_OK
+        )
 
     def destroy(self, request, pk=None):
         if candidates_collection is None:
@@ -352,14 +537,28 @@ def _normalize_candidate(cand):
     cand_title_text = (title + " " + career_text).lower()
     cand_edu_text = edu.lower()
 
+    candidate_id = cand.get('candidate_id') or ''
+
     try:
-        yoe_val = int(yoe)
+        yoe_val = int(float(yoe))
     except (ValueError, TypeError):
         yoe_val = 5
 
+    try:
+        yoe_raw = float(profile.get('years_of_experience') or cand.get('yoe') or 0.0)
+    except (ValueError, TypeError):
+        yoe_raw = 0.0
+
     return {
-        'name': name, 'title': title, 'yoe': yoe, 'yoe_val': yoe_val,
-        'location': location, 'skills': skills, 'edu': edu,
+        'candidate_id': candidate_id,
+        'name': name,
+        'title': title,
+        'yoe': yoe,
+        'yoe_val': yoe_val,
+        'yoe_raw': yoe_raw,
+        'location': location,
+        'skills': skills,
+        'edu': edu,
         'cand_skills_text': cand_skills_text,
         'cand_title_text': cand_title_text,
         'cand_edu_text': cand_edu_text,
@@ -550,14 +749,34 @@ def _score_batch(batch, role_type, jd_keywords_list, priorities_list, jd_title):
                 red_flags = red_flags or ['Limited alignment on key domain experiences']
                 rationale = 'Lacks core technical depth for this scope.'
 
-        overall_score = int(
-            (exp_fit * 0.35 + skills_match * 0.35 + traj * 0.15 + sig * 0.15) * availability
+        # Keep overall_score as a float rounded to 1 decimal place to support
+        # fractional ratios (e.g. 99.2 / 100 -> 0.992)
+        overall_score = round(
+            (exp_fit * 0.35 + skills_match * 0.35 + traj * 0.15 + sig * 0.15) * availability, 1
         )
 
+        # ── Format exact spreadsheet reasoning ─────────────────────────────
+        try:
+            y_float = float(n['yoe_raw'])
+            y_str = f"{int(y_float)}" if y_float.is_integer() else f"{y_float:.1f}"
+        except (ValueError, TypeError):
+            y_str = "0"
+
+        rr_val = rs.get('recruiter_response_rate') if rs else None
+        rr_str = f"{float(rr_val):.2f}" if rr_val is not None else "0.00"
+
+        matched_count = len(matched)
+        title_str = n['title'] or "Candidate"
+        reasoning = f"{title_str} with {y_str} yrs; {matched_count} AI core skills; response rate {rr_str}."
+
         results.append({
+            "candidate_id": n['candidate_id'],
             "name":     name,
             "title":    n['title'],
             "yoe":      n['yoe'],
+            "yoe_raw":  n['yoe_raw'],
+            "matched_skills_count": matched_count,
+            "recruiter_response_rate": rr_val if rr_val is not None else 0.0,
             "location": n['location'],
             "skills":   n['skills'],
             "education": n['edu'],
@@ -571,7 +790,7 @@ def _score_batch(batch, role_type, jd_keywords_list, priorities_list, jd_title):
             },
             "green_flags": green_flags or ['Competent career history', 'Decent skill alignment'],
             "red_flags":   red_flags,
-            "rationale":   rationale or f"Evaluated based on skills ({n['skills']}) and trajectory.",
+            "rationale":   reasoning,
         })
 
     return results

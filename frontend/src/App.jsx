@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useJob } from './context/JobContext';
 import Sidebar from './components/Sidebar';
 import JobDescriptionView from './components/JobDescriptionView';
@@ -22,6 +22,30 @@ const SUBS = {
 
 function App() {
   const { activeTab, results, rankingState, runRanking, toastMessage } = useJob();
+
+  const downloadRankedList = useCallback(() => {
+    if (!results || results.length === 0) return;
+
+    const headers = ['candidate_id', 'rank', 'score', 'reasoning'];
+    const rows = results.map(r => {
+      const scoreRatio = r.overall_score != null ? (r.overall_score / 100) : '';
+      return [
+        `"${(r.candidate_id || r.name || '').replace(/"/g, '""')}"`,
+        r.rank ?? '',
+        scoreRatio,
+        `"${(r.rationale || '').replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ranked_candidates_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [results]);
 
   const renderActiveView = () => {
     switch (activeTab) {
@@ -50,9 +74,19 @@ function App() {
           </div>
           <div className="tb-right" id="tb-a">
             {activeTab === 'results' && results.length > 0 && rankingState !== 'loading' && (
-              <button className="btn ghost" onClick={runRanking} aria-label="Re-rank candidates">
-                <i className="ti ti-refresh" aria-hidden="true"></i> Re-rank
-              </button>
+              <>
+                <button
+                  id="download-ranked-list-btn"
+                  className="btn honey"
+                  onClick={downloadRankedList}
+                  aria-label="Download ranked list as CSV"
+                >
+                  <i className="ti ti-download" aria-hidden="true"></i> Download
+                </button>
+                <button className="btn ghost" onClick={runRanking} aria-label="Re-rank candidates">
+                  <i className="ti ti-refresh" aria-hidden="true"></i> Re-rank
+                </button>
+              </>
             )}
           </div>
         </div>

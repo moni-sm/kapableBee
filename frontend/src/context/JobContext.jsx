@@ -4,188 +4,269 @@ import API from '../api';
 const JobContext = createContext();
 
 const PRESETS = {
-  sde: {
-    title: 'Senior Software Engineer — Platform',
-    company: 'Series B fintech startup',
-    jd: `We're building next-gen real-time data infrastructure at a Series B fintech (300 people, Sequoia-backed). Need a Senior SDE for our platform team.\n\nYou'll own backend systems processing millions of transactions daily.\n\nWhat you'll do:\n- Design high-throughput, low-latency services (p99 < 50ms at 200K RPS)\n- Own system design with long-term impact\n- Mentor 2–3 junior engineers\n- Partner with product and infra\n\nWhat we need:\n- 6+ years, strong distributed systems\n- High-scale backend (microservices, event streaming)\n- Product company experience preferred\n- Payments/fintech a plus`,
-    priorities: 'distributed systems depth, scale experience, product company, mentorship'
-  },
-  pm: {
-    title: 'Senior Product Manager — Growth',
-    company: 'Health-tech B2C',
-    jd: `Senior PM for Growth at a fast-growing B2C health-tech. Own the user acquisition and activation funnel.\n\n- Define and execute growth roadmap\n- Run rigorous A/B experiments (20+ tests/week)\n- Own metrics: WAU, D7 retention, activation rate\n\n4–8 years PM experience, 2+ in consumer tech. Deeply analytical.`,
-    priorities: 'data-driven, consumer product, growth experiments, activation'
-  },
-  ds: {
-    title: 'Data Scientist — Recommendations',
-    company: 'E-commerce marketplace',
-    jd: `Mid-sized e-commerce marketplace hiring a DS to own recommendation and personalization in a 4-person ML team.\n\n- Product recommendation models (collab filtering, two-tower, sequential)\n- A/B test design and analysis\n- Feature engineering from clickstream data\n- Stakeholder communication\n\nStrong Python and SQL. PyTorch or TensorFlow. MLOps a big plus.`,
-    priorities: 'recommendation systems, experimentation rigor, MLOps, business communication'
-  },
-  ml: {
-    title: 'ML Engineer — Production Systems',
-    company: 'Series A AI product company',
-    jd: `Series A AI product company (80 people) hiring an ML Engineer to take models from research to production.\n\n- Build scalable ML pipelines and serving infra\n- Productionize models with research scientists\n- Own model monitoring, retraining, evaluation\n- Optimize inference for latency and cost\n\n3+ years ML engineering. Strong Python, PyTorch. Model serving experience.`,
-    priorities: 'MLOps, production systems, inference optimization, model lifecycle'
-  },
-  em: {
-    title: 'Engineering Manager — Core Platform',
-    company: 'SaaS unicorn',
-    jd: `SaaS unicorn (Series D) hiring a technical EM for our 8-person core platform team. You'll write code, review designs, and grow engineers.\n\n- Lead 8 backend engineers\n- Drive technical roadmap\n- Hire and mentor team\n- Partner with product and design\n\n5+ years engineering, 2+ years management. Strong distributed systems background.`,
-    priorities: 'technical depth, team building, distributed systems, product partnership'
-  },
   ai_sr: {
-    title: 'Senior AI Engineer — Founding Team',
+    title: 'Senior AI Engineer, Founding Team',
     company: 'Redrob AI',
-    jd: `Redrob AI is hiring a Senior AI Engineer (founding team) to own our core retrieval and ranking intelligence layer — Pune/Noida, India (Hybrid).\n\nWe need someone who has shipped end-to-end semantic search or ranking systems to real users — not just run experiments.\n\nWhat you'll own:\n- Design and maintain embeddings-based retrieval pipelines (dense + hybrid search)\n- Own vector database architecture: Pinecone, Weaviate, Qdrant, Milvus, or Elasticsearch/OpenSearch\n- Build and improve ranking evaluation frameworks (NDCG, MRR, MAP)\n- Run rigorous A/B tests to improve retrieval quality\n- Partner with product to translate search quality wins into user-facing improvements\n\nWhat we need:\n- 5–9 years experience, ideally 6–8\n- Deep hands-on Python; sentence-transformers, FAISS, vector DBs\n- Real production deployments — no pure research backgrounds\n- Strong retrieval intuition; opinions on dense vs hybrid vs sparse search\n\nNice to have: LLM fine-tuning (LoRA/QLoRA/PEFT), learning-to-rank (LTR/XGBoost), HR-tech or recruiting-tech domain experience, open-source contributions.\n\nDisqualifiers: < 12 months total AI experience, career limited to IT services (TCS/Infosys/Wipro/Cognizant), primary domain is CV/speech/robotics with no NLP or IR, no production code in last 18 months.`,
-    priorities: 'retrieval systems, vector databases, embeddings, ranking evaluation, production AI, hybrid search'
+    jd: `Redrob AI is hiring a Senior AI Engineer (founding team) to own our core retrieval and ranking intelligence layer — Pune/Noida, India (Hybrid).
+
+Location: Pune/Noida hybrid preferred; open to Hyderabad, Mumbai, Delhi NCR. No visa sponsorship outside India.
+Experience: 5–9 years — strong candidates outside the band still considered.
+
+── WHAT YOU'LL OWN ──
+- Own ranking/retrieval/matching systems (candidate↔JD matching)
+- 90-day plan: audit current BM25+rules system → ship v2 ranking (embeddings, hybrid retrieval, LLM re-ranking) → build eval infra (offline benchmarks, A/B testing)
+- Long-term: architecture ownership + mentoring as team scales 4→12 engineers
+
+── MUST-HAVE SKILLS (non-negotiable) ──
+- Production embeddings-based retrieval (sentence-transformers, OpenAI embeddings, BGE, E5, etc.) — must have handled embedding drift, index refresh, retrieval regressions
+- Production vector DB / hybrid search experience (Pinecone, Weaviate, Qdrant, Milvus, OpenSearch, ES, FAISS)
+- Strong Python — code quality matters
+- Hands-on ranking evaluation experience (NDCG, MRR, MAP, offline↔online correlation, A/B interpretation)
+
+── NICE-TO-HAVE (bonus, not blockers) ──
+- LLM fine-tuning (LoRA/QLoRA/PEFT)
+- Learning-to-rank models (XGBoost or neural)
+- HR-tech/recruiting/marketplace background
+- Distributed systems / large-scale inference optimization
+- Open-source ML contributions
+
+── HARD DISQUALIFIERS ──
+- Pure research/academic background with no production deployment
+- AI experience = only recent (<12mo) LangChain/OpenAI wrapper work, with no pre-LLM ML production history
+- Senior/staff engineers who haven't written production code in 18+ months (pure architecture/tech-lead track)
+
+── SOFT DISQUALIFIERS / RED FLAGS ──
+- Title-chasers (job-hops every ~1.5 years for title bumps)
+- "Framework enthusiasts" — LangChain-tutorial GitHub, no systems thinking
+- Career entirely at consulting firms (TCS, Infosys, Wipro, Accenture, Cognizant, Capgemini) unless prior product-company experience exists
+- CV/speech/robotics specialists without NLP/IR exposure
+- 5+ years entirely on closed-source proprietary work with zero external validation
+
+── LOGISTICS ──
+- Notice period: sub-30 days strongly preferred (can buy out up to 30); 30+ still considered but bar is higher
+- Culture: async-first, heavy writing, fast/open disagreement, unstable/evolving codebase — not a fit for people needing stability
+
+── IDEAL CANDIDATE ──
+6–8 yrs total, 4–5 yrs applied ML/AI at product companies (not services). Shipped at least one end-to-end ranking/search/recsys to real users at scale. Strong, defensible opinions on retrieval, evaluation, and fine-tune-vs-prompt tradeoffs. Based in/willing to relocate to Noida or Pune. Active/reachable on the platform.
+
+── SCORING NOTE ──
+Keyword-matching is a trap — do not reward candidates just for having "RAG"/"Pinecone" in skills. Career narrative > keyword list. Behavioral signals matter for availability: a perfect on-paper match with 6 months of inactivity and 5% recruiter response rate should be down-weighted.`,
+    priorities: 'production retrieval systems, embeddings, vector databases, ranking evaluation (NDCG/MRR/MAP), hybrid search, A/B testing, Python, product company experience'
   }
 };
 
-const SAMPLES = [
-  {
-    name: 'Arjun Mehta',
-    title: 'Staff Engineer, Swiggy',
-    yoe: '9',
-    edu: 'M.Tech CS, IISc Bangalore',
-    skills: 'Python, Go, Kafka, Kubernetes, distributed systems, system design, leadership',
-    summary: "Led backend architecture for Swiggy's order management system — 2M+ daily orders, scaled 50K→500K RPM. Previously Amazon India. Mentors 6-person team.",
-    signals: 'GitHub 1200 stars, AWS re:Invent India speaker, 3 engineering blog posts',
-    location: 'Bangalore'
-  },
-  {
-    name: 'Priya Nair',
-    title: 'Senior ML Engineer, Ola',
-    yoe: '6',
-    edu: 'B.Tech CSE, NIT Trichy',
-    skills: 'Python, TensorFlow, PyTorch, MLOps, feature engineering, A/B testing, SQL',
-    summary: "Built Ola's real-time driver-matching ML model, cut avg wait time 18%. End-to-end ML pipeline ownership. Kaggle grandmaster.",
-    signals: 'Kaggle grandmaster, 2 ICML workshop papers, active PyTorch community',
-    location: 'Hyderabad'
-  },
-  {
-    name: 'Rohan Gupta',
-    title: 'Full Stack Developer, early-stage startup',
-    yoe: '3',
-    edu: 'B.E. IT, VIT',
-    skills: 'React, Node.js, MongoDB, Docker, REST APIs',
-    summary: 'Early-stage SaaS startup. 3 features shipped end-to-end. Limited scale experience, fast learner. Strong frontend.',
-    signals: 'Leetcode 400 solved, personal tech blog 500 followers',
-    location: 'Pune'
-  },
-  {
-    name: 'Kavya Reddy',
-    title: 'Engineering Manager, PhonePe',
-    yoe: '11',
-    edu: 'B.Tech CSE, BITS Pilani; MBA IIM A',
-    skills: 'System design, Java, microservices, cross-functional leadership, OKR planning, hiring',
-    summary: "EM for PhonePe's payments core (12 engineers). 99.99% uptime for UPI. Built team from 5 to 12.",
-    signals: 'StaffEng India speaker, IIM Bangalore guest lecturer, LinkedIn 8K followers',
-    location: 'Bangalore'
-  },
-  {
-    name: 'Nikhil Joshi',
-    title: 'SDE-2, TCS',
-    yoe: '5',
-    edu: 'B.E. CS, Pune University',
-    skills: 'Java, Spring Boot, MySQL, REST APIs, basic AWS',
-    summary: 'Enterprise banking apps at TCS. Solid IT services background, limited product company exposure.',
-    signals: 'Internal recognition award',
-    location: 'Mumbai'
-  },
-  {
-    name: 'Aisha Khan',
-    title: 'Senior SDE, Razorpay',
-    yoe: '7',
-    edu: 'B.Tech CSE, IIIT Hyderabad',
-    skills: 'Go, Python, gRPC, PostgreSQL, Redis, payments infrastructure',
-    summary: "Core engineer on Razorpay's payment gateway. Fraud detection microservice cut false positives 35%. Led 3-person pod.",
-    signals: 'Contributed to Go stdlib, 2 CVE credits, fintech podcast guest',
-    location: 'Bangalore'
-  },
-  {
-    name: 'Siddharth Rao',
-    title: 'Principal Engineer, Freshworks',
-    yoe: '13',
-    edu: 'M.S. CS, UT Austin',
-    skills: 'Ruby, Python, multi-tenancy, SaaS architecture, CRM systems, technical vision',
-    summary: 'Defines technical strategy for Freshdesk platform. Deep SaaS expertise. Returned from US 3 years ago.',
-    signals: '"SaaS engineering at scale" e-book, 5K GitHub followers',
-    location: 'Chennai'
-  }
-];
 
+
+// ---------------------------------------------------------------------------
+// Helper: days since an ISO date string
+// ---------------------------------------------------------------------------
+const daysSince = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr.slice(0, 10));
+    if (isNaN(d)) return null;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  } catch { return null; }
+};
+
+// ---------------------------------------------------------------------------
+// Availability multiplier  (floor 0.40)
+// ---------------------------------------------------------------------------
+// Applied as a GLOBAL multiplier on the final composite score — down-weights
+// unavailable candidates regardless of their technical fit, per JD instruction.
+//
+// Groups: availability/activity, reliability/follow-through, logistics
+// ---------------------------------------------------------------------------
 const getAvailabilityMultiplier = (signals) => {
   if (!signals) return 1.0;
-  let multiplier = 1.0;
-  
-  const lastActive = signals.last_active_days;
-  if (lastActive !== undefined && lastActive !== null) {
-    if (lastActive > 180) multiplier *= 0.60;
-    else if (lastActive > 90) multiplier *= 0.80;
-    else if (lastActive > 30) multiplier *= 0.90;
+  let m = 1.0;
+
+  // last_active_date (ISO string) — preferred; fall back to last_active_days int
+  let lastActiveDays = signals.last_active_days ?? null;
+  if (lastActiveDays === null) lastActiveDays = daysSince(signals.last_active_date);
+  if (lastActiveDays !== null) {
+    if (lastActiveDays > 180)      m *= 0.55;  // 6+ months dark
+    else if (lastActiveDays > 90)  m *= 0.78;  // 3–6 months
+    else if (lastActiveDays > 30)  m *= 0.92;  // 1–3 months
+    // <= 30 → 1.0
   }
-  
-  if (signals.open_to_work_flag === false) multiplier *= 0.80;
-  
+
+  // open_to_work_flag
+  if (signals.open_to_work_flag === false) m *= 0.80;
+
+  // recruiter_response_rate [0.0, 1.0]
   const rrr = signals.recruiter_response_rate;
-  if (rrr !== undefined && rrr !== null) {
-    if (rrr < 0.20) multiplier *= 0.70;
-    else if (rrr < 0.50) multiplier *= 0.90;
+  if (rrr != null) {
+    if (rrr < 0.10)      m *= 0.60;
+    else if (rrr < 0.20) m *= 0.72;
+    else if (rrr < 0.40) m *= 0.88;
+    // >= 0.40 → 1.0
   }
-  
+
+  // avg_response_time_hours
+  const rth = signals.avg_response_time_hours;
+  if (rth != null) {
+    if (rth > 168)      m *= 0.88;  // > 1 week
+    else if (rth > 72)  m *= 0.95;  // > 3 days
+    // <= 72h → 1.0
+  }
+
+  // applications_submitted_30d — 0 = on platform but not actively searching
+  if (signals.applications_submitted_30d === 0) m *= 0.93;
+
+  // interview_completion_rate [0.0, 1.0]
   const icr = signals.interview_completion_rate;
-  if (icr !== undefined && icr !== null && icr < 0.50) multiplier *= 0.80;
-  
-  const notice = signals.notice_period_days;
-  if (notice !== undefined && notice !== null) {
-    if (notice > 90) multiplier *= 0.85;
-    else if (notice > 60) multiplier *= 0.92;
+  if (icr != null) {
+    if (icr < 0.30)      m *= 0.72;
+    else if (icr < 0.50) m *= 0.88;
+    // >= 0.50 → 1.0
   }
-  
-  return Math.max(0.40, multiplier);
+
+  // offer_acceptance_rate [-1, 1.0]
+  // SENTINEL: -1 = no prior offers → neutral, NOT penalised
+  const oa = signals.offer_acceptance_rate;
+  if (oa != null && oa !== -1) {
+    if (oa < 0.30)      m *= 0.82;
+    else if (oa < 0.50) m *= 0.93;
+    // >= 0.50 → 1.0
+  }
+
+  // notice_period_days
+  const notice = signals.notice_period_days;
+  if (notice != null) {
+    if (notice > 90)      m *= 0.82;
+    else if (notice > 60) m *= 0.91;
+    else if (notice > 30) m *= 0.97;
+    // <= 30 (JD preference) → 1.0
+  }
+
+  // preferred_work_mode (onsite/hybrid/remote/flexible)
+  // Remote-only preference adds friction for roles that typically require some presence.
+  // 'flexible', 'hybrid', 'onsite', or missing → neutral (1.0)
+  const workMode = (signals.preferred_work_mode || '').toLowerCase();
+  if (workMode === 'remote') m *= 0.96;  // mild penalty — most senior eng roles are hybrid+
+
+  // willing_to_relocate — compound penalty when not open to work AND won't relocate
+  const relocate  = signals.willing_to_relocate;
+  const otwFlag   = signals.open_to_work_flag;
+  if (relocate === false && otwFlag === false) {
+    m *= 0.92;   // doubly unavailable: not looking + geographically rigid
+  } else if (relocate === false) {
+    m *= 0.97;   // willing to work but won't relocate
+  }
+  // true or missing → 1.0
+
+  // expected_salary_range_inr_lpa — malformed or extreme data signals offer-stage friction
+  const sal    = signals.expected_salary_range_inr_lpa || {};
+  const salMin = sal.min != null ? parseFloat(sal.min) : null;
+  const salMax = sal.max != null ? parseFloat(sal.max) : null;
+  if (salMin !== null && salMax !== null && !isNaN(salMin) && !isNaN(salMax)) {
+    if (salMin > salMax)  m *= 0.97;  // inverted range = data integrity issue
+    else if (salMin > 200) m *= 0.95; // >200 LPA floor = overqualified risk
+  }
+
+  return Math.max(0.40, m);
 };
 
+// ---------------------------------------------------------------------------
+// Signals & Culture dimension score  (0–100)
+// ---------------------------------------------------------------------------
+// Fourth scoring dimension — covers external validation, skill credibility,
+// and market demand.  Does NOT double-count availability signals (those go
+// into the global multiplier above).
+//
+// Groups: skill validation, market demand, profile quality, trust/verification
+// ---------------------------------------------------------------------------
 const getSignalsScore = (signals, candSignalsText) => {
   if (!signals) {
-    let sig = 55;
+    // Legacy text-based fallback for old flat-schema candidates
+    let sig = 50;
     if (candSignalsText.includes('github') || candSignalsText.includes('stars')) sig += 15;
-    if (candSignalsText.includes('speaker') || candSignalsText.includes('talk') || candSignalsText.includes('conference')) sig += 15;
+    if (['speaker', 'talk', 'conference'].some(k => candSignalsText.includes(k))) sig += 12;
     if (candSignalsText.includes('contribute') || candSignalsText.includes('open-source')) sig += 10;
+    if (candSignalsText.includes('kaggle')) sig += 8;
+    if (['paper', 'arxiv', 'acl', 'neurips', 'sigir'].some(k => candSignalsText.includes(k))) sig += 10;
     return Math.min(96, sig);
   }
-  
+
   let score = 0;
-  
-  const githubScore = signals.github_activity_score !== undefined ? signals.github_activity_score : -1;
-  if (githubScore > 80) score += 30;
-  else if (githubScore > 50) score += 20;
-  else if (githubScore > 0) score += 10;
-  
-  const skillAssessments = signals.skill_assessment_scores;
-  if (skillAssessments) {
-    const values = Object.values(skillAssessments);
-    if (values.length > 0) {
-      const avg = values.reduce((sum, v) => sum + parseFloat(v), 0) / values.length;
-      score += Math.min(25, avg * 0.25);
+
+  // ── Skill validation ────────────────────────────────────────────────────
+
+  // github_activity_score → max 25 pts
+  // SENTINEL: -1 = no GitHub linked → neutral (0 pts), not penalised
+  const github = signals.github_activity_score ?? -1;
+  if (github !== -1 && github !== null) {
+    if (github > 80)      score += 25;
+    else if (github > 60) score += 18;
+    else if (github > 40) score += 12;
+    else if (github > 15) score += 6;
+    // <= 15 → 0 pts
+  }
+
+  // skill_assessment_scores → max 30 pts
+  const sas = signals.skill_assessment_scores;
+  if (sas && typeof sas === 'object') {
+    const vals = Object.values(sas).map(v => parseFloat(v)).filter(v => !isNaN(v));
+    if (vals.length > 0) {
+      const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+      score += Math.min(30, Math.round(avg * 0.30));
     }
   }
-  
+
+  // ── Market demand ────────────────────────────────────────────────────────
+
+  // endorsements_received → max 12 pts
   const endorsements = signals.endorsements_received || 0;
-  if (endorsements > 20) score += 15;
-  else if (endorsements > 10) score += 10;
-  else if (endorsements > 5) score += 5;
-  
+  if (endorsements > 50)      score += 12;
+  else if (endorsements > 25) score += 8;
+  else if (endorsements > 10) score += 5;
+  else if (endorsements > 3)  score += 2;
+
+  // saved_by_recruiters_30d → max 10 pts
   const saved = signals.saved_by_recruiters_30d || 0;
-  if (saved > 5) score += 15;
-  else if (saved > 2) score += 8;
-  
+  if (saved > 8)      score += 10;
+  else if (saved > 4) score += 6;
+  else if (saved > 1) score += 3;
+
+  // profile_views_received_30d → max 5 pts
+  const views = signals.profile_views_received_30d || 0;
+  if (views > 40)      score += 5;
+  else if (views > 15) score += 3;
+
+  // search_appearance_30d → max 4 pts
+  const appear = signals.search_appearance_30d || 0;
+  if (appear > 300)      score += 4;
+  else if (appear > 100) score += 2;
+
+  // connection_count → max 3 pts
+  const conns = signals.connection_count || 0;
+  if (conns > 500)      score += 3;
+  else if (conns > 200) score += 1;
+
+  // ── Profile quality ──────────────────────────────────────────────────────
+
+  // profile_completeness_score → max 8 pts
   const completeness = signals.profile_completeness_score || 0;
-  if (completeness > 85) score += 10;
-  else if (completeness > 60) score += 5;
-  
-  if (signals.linkedin_connected) score += 5;
-  
+  if (completeness > 90)      score += 8;
+  else if (completeness > 75) score += 5;
+  else if (completeness > 55) score += 2;
+
+  // ── Trust / verification (gate-useful, low individual signal) ────────────
+  if (signals.verified_email)     score += 1;
+  if (signals.verified_phone)     score += 1;
+  if (signals.linkedin_connected) score += 3;  // stronger signal
+
+  // ── Platform tenure via signup_date → max 3 pts ─────────────────────────
+  // Longer on the platform = more invested, more data for scoring reliability.
+  const signupDays = daysSince(signals.signup_date);
+  if (signupDays !== null) {
+    if (signupDays > 365)      score += 3;  // > 1 year: established member
+    else if (signupDays > 180) score += 2;  // 6–12 months
+    else if (signupDays > 90)  score += 1;  // 3–6 months
+    // < 90 days (brand new) → 0 pts
+  }
+
   return Math.min(100, score);
 };
 
@@ -334,35 +415,6 @@ export const JobProvider = ({ children }) => {
     return () => clearTimeout(delayDebounceFn);
   }, [jobTitle, company, jobDescription, keyPriorities, isAuthenticated]);
 
-  const loadSampleDataset = async () => {
-    if (isAuthenticated) {
-      setUploadState('uploading');
-      setUploadProgress(20);
-      // Save all sample candidates to backend MongoDB
-      try {
-        const res = await API.post('candidates/bulk/', SAMPLES);
-        const newCands = res.data;
-        setCandidates(prev => [...newCands, ...prev].slice(0, 50));
-        setTotalCandidatesCount(prev => prev + SAMPLES.length);
-        setFiles(prev => [...prev, { name: 'sample_dataset', size: '12.4 KB', candidatesCount: SAMPLES.length }]);
-        showToast('Sample dataset saved to server MongoDB');
-        setUploadProgress(100);
-        setUploadState('completed');
-        setTimeout(() => setUploadState('idle'), 2000);
-      } catch (e) {
-        console.error('Error saving sample candidates:', e);
-        showToast('Error syncing sample dataset to server');
-        setUploadState('failed');
-        setTimeout(() => setUploadState('idle'), 2000);
-      }
-    } else {
-      setCandidates([...SAMPLES]);
-      setTotalCandidatesCount(SAMPLES.length);
-      setFiles([{ name: 'kapablebee_sample.json', size: '12.4 KB', candidatesCount: SAMPLES.length }]);
-      setResults([]);
-      showToast('Sample dataset loaded (Local Guest Mode)');
-    }
-  };
 
   const addManualCandidate = async (c) => {
     if (isAuthenticated) {
@@ -633,7 +685,7 @@ export const JobProvider = ({ children }) => {
       const profile = cand.profile || {};
       const name = profile.anonymized_name || cand.name || 'Unknown';
       const title = profile.current_title || cand.title || '';
-      
+      const yoeRaw = profile.years_of_experience ?? cand.yoe ?? '0';
       let yoeVal = 5;
       if (profile.years_of_experience !== undefined) {
         yoeVal = parseInt(profile.years_of_experience);
@@ -870,13 +922,24 @@ export const JobProvider = ({ children }) => {
           rationale = `Lacks the core technical depth or specific framework scaling expertise outlined in the job description. Trajectory is slightly off-course for this scope.`;
         }
       }
+      const overall_score = Math.round(((experienceFit * 0.35) + (skillsMatch * 0.35) + (trajectory * 0.15) + (signalsCulture * 0.15)) * availability * 10) / 10;
 
-      const overall_score = Math.round(((experienceFit * 0.35) + (skillsMatch * 0.35) + (trajectory * 0.15) + (signalsCulture * 0.15)) * availability);
+      const yFloat = parseFloat(yoeRaw);
+      const yStr = isNaN(yFloat) ? "0" : (Number.isInteger(yFloat) ? yFloat.toString() : yFloat.toFixed(1));
+      const rrVal = redrobSignals.recruiter_response_rate;
+      const rrStr = (rrVal != null && !isNaN(parseFloat(rrVal))) ? parseFloat(rrVal).toFixed(2) : "0.00";
+      const matchedCount = matchedSkills.length;
+      const titleStr = title || "Candidate";
+      const reasoning = `${titleStr} with ${yStr} yrs; ${matchedCount} AI core skills; response rate ${rrStr}.`;
 
       return {
+        candidate_id: cand.candidate_id || '',
         name: name,
         title: title,
         yoe: yoeVal,
+        yoe_raw: yFloat,
+        matched_skills_count: matchedCount,
+        recruiter_response_rate: rrVal ?? 0.0,
         location: location,
         skills: skills,
         education: edu,
@@ -890,7 +953,7 @@ export const JobProvider = ({ children }) => {
         },
         green_flags: greenFlags.length > 0 ? greenFlags : ['Competent career history', 'Decent skill alignment'],
         red_flags: redFlags,
-        rationale: rationale || `Evaluated candidate based on skills (${skills}) and trajectory. Overall score matches general fit.`
+        rationale: reasoning
       };
     });
 
@@ -932,7 +995,6 @@ export const JobProvider = ({ children }) => {
         toastMessage,
         showToast,
         applyPreset,
-        loadSampleDataset,
         addManualCandidate,
         removeCandidate,
         parseFile,
