@@ -637,4 +637,4 @@ The decision to build deterministic reasoning rather than using an LLM was delib
 
 ---
 
-*Document auto-generated from live codebase. All algorithms, weights, and signal thresholds reflect the actual running implementation.*
+
